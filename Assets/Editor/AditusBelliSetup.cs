@@ -1,5 +1,6 @@
 using System.IO;
 using AditusBelli.CameraControl;
+using AditusBelli.Map;
 using AditusBelli.Units;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -100,6 +101,12 @@ namespace AditusBelli.EditorTools
             tilemap.SetTiles(positions, tiles);
             tilemap.RefreshAllTiles();
             tilemap.CompressBounds();
+
+            // Logical grid + pathfinding bridge (auto-finds the ground tilemap child).
+            gridGo.AddComponent<GameGrid>();
+
+            // Static obstacles: a wall with a gap, to demonstrate pathfinding.
+            BuildObstacles(grid);
 
             // --- Units + selection system ---
             GameObject unitPrefab = BuildUnitPrefab();
@@ -232,6 +239,34 @@ namespace AditusBelli.EditorTools
             GameObject prefab = PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
             Object.DestroyImmediate(go);
             return prefab;
+        }
+
+        private static void BuildObstacles(Grid grid)
+        {
+            Sprite rock = CreateOrLoadSprite(
+                "obstacle_rock",
+                () => MakeDiamondTexture(256, 128, new Color32(90, 84, 78, 255)),
+                ppu: 256f);
+
+            var container = new GameObject("Obstacles");
+
+            // Vertical wall at x = 5, with a gap at y = 0 so units must funnel through.
+            int[] wallYs = { -3, -2, -1, 1, 2, 3 };
+            foreach (int y in wallYs)
+            {
+                var cell = new Vector3Int(5, y, 0);
+                var go = new GameObject($"Rock_5_{y}");
+                go.transform.SetParent(container.transform);
+                Vector3 p = grid.GetCellCenterWorld(cell);
+                p.z = 0f;
+                go.transform.position = p;
+
+                var sr = go.AddComponent<SpriteRenderer>();
+                sr.sprite = rock;
+                sr.sortingOrder = 2; // same band as units; isometric Y-sort handles occlusion
+
+                go.AddComponent<GridObstacle>();
+            }
         }
 
         private static void SpawnUnits(GameObject prefab, Grid grid)
