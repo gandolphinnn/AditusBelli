@@ -122,9 +122,18 @@ namespace AditusBelli.Units
 
         private void HandleMoveCommand(Vector2 screenPos)
         {
-            if (_selected.Count == 0) return;
-
             Vector3 world = _cam.ScreenToWorldPoint(screenPos);
+
+            if (_selected.Count == 0)
+            {
+                // No units selected: right-click sets a production building's rally point.
+                if (SelectedBuilding != null)
+                {
+                    var producer = SelectedBuilding.GetComponent<UnitProducer>();
+                    if (producer != null) producer.SetRallyPoint(world);
+                }
+                return;
+            }
 
             Collider2D hit = Physics2D.OverlapPoint(world);
 

@@ -114,6 +114,7 @@ namespace AditusBelli.EditorTools
             // --- Units + selection system ---
             GameObject unitPrefab = BuildUnitPrefab();
             SpawnUnits(unitPrefab, grid);
+            UnitDef villagerDef = CreateVillagerDef(unitPrefab);
 
             var systemsGo = new GameObject("Game Systems");
             systemsGo.AddComponent<UnitSelectionManager>();
@@ -125,12 +126,13 @@ namespace AditusBelli.EditorTools
             systemsGo.AddComponent<PlayerPopulation>();
             systemsGo.AddComponent<ResourceHud>();
             systemsGo.AddComponent<SelectionInfoHud>();
+            systemsGo.AddComponent<ProductionHud>();
 
             var placer = systemsGo.AddComponent<BuildingPlacer>();
             placer.houseDef = CreateHouseDef();
 
-            // Economy: drop-off building and resource nodes.
-            BuildEconomy(grid);
+            // Economy: drop-off building (with villager training) and resource nodes.
+            BuildEconomy(grid, villagerDef);
 
             // Force re-serialization: without marking dirty, SaveScene may write
             // the tilemap still empty (native tile data is not flushed otherwise).
@@ -361,7 +363,31 @@ namespace AditusBelli.EditorTools
             return def;
         }
 
-        private static void CreateBuilding(BuildingDef def, Vector3Int originCell, Grid grid,
+        private static UnitDef CreateVillagerDef(GameObject prefab)
+        {
+            EnsureFolder("Assets/Data");
+            EnsureFolder("Assets/Data/Units");
+
+            const string path = "Assets/Data/Units/Villager.asset";
+            var def = AssetDatabase.LoadAssetAtPath<UnitDef>(path);
+            if (def == null)
+            {
+                def = ScriptableObject.CreateInstance<UnitDef>();
+                AssetDatabase.CreateAsset(def, path);
+            }
+
+            def.displayName = "Villager";
+            def.foodCost = 50;
+            def.woodCost = 0;
+            def.trainTime = 6f;
+            def.populationCost = 1;
+            def.prefab = prefab;
+            EditorUtility.SetDirty(def);
+            AssetDatabase.SaveAssets();
+            return def;
+        }
+
+        private static Building CreateBuilding(BuildingDef def, Vector3Int originCell, Grid grid,
             bool completed, float scale, Transform parent)
         {
             var go = new GameObject(def.displayName);
@@ -388,13 +414,16 @@ namespace AditusBelli.EditorTools
             building.def = def;
             building.originCell = new Vector2Int(originCell.x, originCell.y);
             building.startCompleted = completed;
+            return building;
         }
 
-        private static void BuildEconomy(Grid grid)
+        private static void BuildEconomy(Grid grid, UnitDef villagerDef)
         {
-            // Town Center: completed 2x2 building acting as a resource drop-off.
-            CreateBuilding(CreateTownCenterDef(), new Vector3Int(-3, 0, 0), grid,
+            // Town Center: completed 2x2 building, resource drop-off and villager trainer.
+            Building townCenter = CreateBuilding(CreateTownCenterDef(), new Vector3Int(-3, 0, 0), grid,
                 completed: true, scale: 1f, parent: null);
+            var producer = townCenter.gameObject.AddComponent<UnitProducer>();
+            producer.trainable = new[] { villagerDef };
 
             // Trees (Wood).
             Sprite treeSprite = CreateOrLoadSprite(
