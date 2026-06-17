@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using AditusBelli.Economy;
 using AditusBelli.Map;
 using UnityEngine;
@@ -16,6 +17,8 @@ namespace AditusBelli.Buildings
         public Vector2Int originCell;
         public bool startCompleted;
 
+        public static readonly List<Building> All = new();
+
         private SpriteRenderer _sr;
         private float _progress;
         private bool _complete;
@@ -27,6 +30,9 @@ namespace AditusBelli.Buildings
         public BuildingDef Def => def;
 
         private void Awake() => _sr = GetComponent<SpriteRenderer>();
+
+        private void OnEnable() => All.Add(this);
+        private void OnDisable() => All.Remove(this);
 
         private void Start()
         {

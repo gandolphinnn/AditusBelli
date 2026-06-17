@@ -20,17 +20,23 @@ namespace AditusBelli.Combat
         [Tooltip("If false, the unit never moves: it only fights what is already within melee range.")]
         public bool mobile = true;
 
+        [Tooltip("If > 0, the unit only defends within this radius of its start position (a leash).")]
+        public float guardRadius = 0f;
+
         private Unit _unit;
         private Owner _owner;
         private Health _target;
         private float _cooldown;
         private float _scanTimer;
+        private Vector3 _home;
 
         private void Awake()
         {
             _unit = GetComponent<Unit>();
             _owner = GetComponent<Owner>();
         }
+
+        private void Start() => _home = transform.position;
 
         public void AttackTarget(Health target)
         {
@@ -43,31 +49,40 @@ namespace AditusBelli.Combat
         {
             if (_cooldown > 0f) _cooldown -= Time.deltaTime;
 
-            if (_target == null || !_target.IsAlive)
+            if (_target != null && _target.IsAlive)
             {
-                _target = null;
-                AutoAcquire();
+                float dist = Vector2.Distance(transform.position, _target.transform.position);
+                if (dist <= attackRange)
+                {
+                    _unit.Stop();
+                    if (_cooldown <= 0f)
+                    {
+                        _target.TakeDamage(attackDamage);
+                        _cooldown = attackCooldown;
+                    }
+                    return;
+                }
+
+                if (!mobile || BeyondLeash(_target.transform.position))
+                    _target = null;                       // immobile, or target left the guarded area
+                else if (!_unit.IsMoving)
+                    _unit.MoveTo(_target.transform.position);
                 return;
             }
 
-            float dist = Vector2.Distance(transform.position, _target.transform.position);
-            if (dist <= attackRange)
-            {
-                _unit.Stop();
-                if (_cooldown <= 0f)
-                {
-                    _target.TakeDamage(attackDamage);
-                    _cooldown = attackCooldown;
-                }
-            }
-            else if (mobile)
-            {
-                if (!_unit.IsMoving) _unit.MoveTo(_target.transform.position);
-            }
-            else
-            {
-                _target = null; // immobile: never chase, only fight what is already in range
-            }
+            _target = null;
+            AutoAcquire();
+            if (_target == null) ReturnHome();
+        }
+
+        private bool BeyondLeash(Vector3 pos) =>
+            guardRadius > 0f && ((Vector2)(pos - _home)).sqrMagnitude > guardRadius * guardRadius;
+
+        private void ReturnHome()
+        {
+            if (guardRadius <= 0f || !mobile || _unit.IsMoving) return;
+            if (((Vector2)(transform.position - _home)).sqrMagnitude > 0.25f)
+                _unit.MoveTo(_home);
         }
 
         private void AutoAcquire()
@@ -90,6 +105,7 @@ namespace AditusBelli.Combat
 
                 var otherOwner = h.GetComponent<Owner>();
                 if (otherOwner == null || !_owner.IsHostileTo(otherOwner)) continue;
+                if (BeyondLeash(h.transform.position)) continue; // guards ignore enemies outside their leash
 
                 float sq = ((Vector2)(h.transform.position - transform.position)).sqrMagnitude;
                 if (sq <= bestSq) { bestSq = sq; best = h; }

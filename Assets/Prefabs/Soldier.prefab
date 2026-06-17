@@ -193,6 +193,7 @@ MonoBehaviour:
   attackCooldown: 1
   aggroRange: 5
   mobile: 1
+  guardRadius: 0
 --- !u!1 &2018165226619509286
 GameObject:
   m_ObjectHideFlags: 0

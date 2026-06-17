@@ -3,6 +3,7 @@ using AditusBelli.Buildings;
 using AditusBelli.CameraControl;
 using AditusBelli.Combat;
 using AditusBelli.Economy;
+using AditusBelli.Game;
 using AditusBelli.Map;
 using AditusBelli.Teams;
 using AditusBelli.UI;
@@ -26,7 +27,7 @@ namespace AditusBelli.EditorTools
         private const string ArtDir = "Assets/Art/Generated";
         private const string SceneDir = "Assets/Scenes";
         private const string ScenePath = "Assets/Scenes/Game.unity";
-        private const int MapSize = 24;
+        private const int MapSize = 40;
 
         [MenuItem("Aditus Belli/1. Configure Project Settings")]
         public static void ConfigureProject()
@@ -140,6 +141,8 @@ namespace AditusBelli.EditorTools
             var teamManager = systemsGo.AddComponent<TeamManager>();
             teamManager.teams = new[] { playerTeam, enemyTeam };
             teamManager.localPlayer = playerTeam;
+
+            systemsGo.AddComponent<MatchManager>();
 
             var placer = systemsGo.AddComponent<BuildingPlacer>();
             placer.houseDef = CreateHouseDef();
@@ -353,11 +356,14 @@ namespace AditusBelli.EditorTools
             BuildingDef wallDef = CreateWallDef();
             var container = new GameObject("Walls");
 
-            // Vertical wall at x = 5, with a gap at y = 0 so units must funnel through.
-            int[] wallYs = { -3, -2, -1, 1, 2, 3 };
-            foreach (int y in wallYs)
+            // A long wall at x = 5 with a 2-cell gap up at y = 3..4 (off the direct
+            // base-to-enemy line), so a correct route must visibly detour around it.
+            for (int y = -5; y <= 5; y++)
+            {
+                if (y == 3 || y == 4) continue; // the gap
                 CreateBuilding(wallDef, new Vector3Int(5, y, 0), grid,
                     completed: true, scale: 1f, parent: container.transform);
+            }
         }
 
         private static void BuildEconomy(Grid grid, UnitDef villagerDef, TeamDef playerTeam)
@@ -397,6 +403,32 @@ namespace AditusBelli.EditorTools
             };
             foreach (Vector3Int c in bushCells)
                 CreateResourceNode(bushes.transform, bushSprite, grid, c, ResourceType.Food, 75, "Bush");
+
+            // Gold mines.
+            Sprite goldSprite = CreateOrLoadSprite(
+                "res_gold",
+                () => MakeCircleTexture(56, new Color32(230, 200, 60, 255), new Color32(120, 100, 20, 255)),
+                ppu: 80f);
+            var goldNodes = new GameObject("GoldMines");
+            Vector3Int[] goldCells =
+            {
+                new Vector3Int(-10, 3, 0), new Vector3Int(-11, 3, 0), new Vector3Int(-10, 2, 0),
+            };
+            foreach (Vector3Int c in goldCells)
+                CreateResourceNode(goldNodes.transform, goldSprite, grid, c, ResourceType.Gold, 150, "Gold");
+
+            // Stone mines.
+            Sprite stoneSprite = CreateOrLoadSprite(
+                "res_stone",
+                () => MakeCircleTexture(56, new Color32(150, 150, 160, 255), new Color32(70, 70, 80, 255)),
+                ppu: 80f);
+            var stoneNodes = new GameObject("StoneMines");
+            Vector3Int[] stoneCells =
+            {
+                new Vector3Int(-10, -3, 0), new Vector3Int(-11, -3, 0), new Vector3Int(-10, -2, 0),
+            };
+            foreach (Vector3Int c in stoneCells)
+                CreateResourceNode(stoneNodes.transform, stoneSprite, grid, c, ResourceType.Stone, 150, "Stone");
         }
 
         private static void BuildEnemy(Grid grid, TeamDef enemyTeam, GameObject soldierPrefab)
@@ -404,11 +436,11 @@ namespace AditusBelli.EditorTools
             var container = new GameObject("Enemy");
 
             // Enemy camp (a destructible building) on the right side of the map.
-            CreateBuilding(CreateEnemyCampDef(), new Vector3Int(9, 0, 0), grid,
+            CreateBuilding(CreateEnemyCampDef(), new Vector3Int(12, 0, 0), grid,
                 completed: true, scale: 1f, parent: container.transform, team: enemyTeam);
 
-            // A couple of enemy soldiers guarding it.
-            Vector3Int[] guards = { new Vector3Int(8, 2, 0), new Vector3Int(8, -2, 0) };
+            // A couple of enemy soldiers guarding it (defensive, leashed to their post).
+            Vector3Int[] guards = { new Vector3Int(11, 2, 0), new Vector3Int(11, -2, 0) };
             foreach (Vector3Int cell in guards)
             {
                 var go = (GameObject)PrefabUtility.InstantiatePrefab(soldierPrefab);
@@ -421,7 +453,11 @@ namespace AditusBelli.EditorTools
                 if (owner != null) owner.team = enemyTeam;
 
                 var combatant = go.GetComponent<Combatant>();
-                if (combatant != null) combatant.mobile = false; // immobile defenders for testing
+                if (combatant != null)
+                {
+                    combatant.mobile = true;    // defends but does not roam
+                    combatant.guardRadius = 7f; // leashed to its post
+                }
             }
         }
 

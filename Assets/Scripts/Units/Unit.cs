@@ -49,16 +49,22 @@ namespace AditusBelli.Units
             GameGrid grid = GameGrid.Instance;
             if (grid != null)
             {
+                // With a grid we only ever follow a real path; we never walk in a
+                // straight line through obstacles. If there is no route, stay put.
                 List<Vector3> route = grid.FindPath(transform.position, worldPosition);
                 if (route != null && route.Count > 0)
                 {
                     _path.AddRange(route);
                     _hasTarget = true;
-                    return;
                 }
+                else
+                {
+                    _hasTarget = false;
+                }
+                return;
             }
 
-            // Fallback: straight line toward the goal.
+            // No grid available at all: straight line toward the goal.
             _path.Add(worldPosition);
             _hasTarget = true;
         }
