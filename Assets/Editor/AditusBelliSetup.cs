@@ -1,6 +1,8 @@
 using System.IO;
 using AditusBelli.CameraControl;
+using AditusBelli.Economy;
 using AditusBelli.Map;
+using AditusBelli.UI;
 using AditusBelli.Units;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -23,7 +25,7 @@ namespace AditusBelli.EditorTools
         private const string ScenePath = "Assets/Scenes/Game.unity";
         private const int MapSize = 24;
 
-        [MenuItem("Aditus Belli/Setup/1. Configure Project Settings")]
+        [MenuItem("Aditus Belli/1. Configure Project Settings")]
         public static void ConfigureProject()
         {
             // Isometric sprite sorting: sprites lower on screen draw in front.
@@ -39,7 +41,7 @@ namespace AditusBelli.EditorTools
             Debug.Log("[AditusBelli] Settings configured: isometric sort axis, tags and layers.");
         }
 
-        [MenuItem("Aditus Belli/Setup/2. Build Starter Scene")]
+        [MenuItem("Aditus Belli/2. Build Starter Scene")]
         public static void BuildStarterScene()
         {
             ConfigureProject();
@@ -114,6 +116,12 @@ namespace AditusBelli.EditorTools
 
             var systemsGo = new GameObject("Game Systems");
             systemsGo.AddComponent<UnitSelectionManager>();
+            systemsGo.AddComponent<PlayerResources>();
+            systemsGo.AddComponent<ResourceHud>();
+            systemsGo.AddComponent<SelectionInfoHud>();
+
+            // Economy: drop-off building and resource nodes.
+            BuildEconomy(grid);
 
             // Force re-serialization: without marking dirty, SaveScene may write
             // the tilemap still empty (native tile data is not flushed otherwise).
@@ -225,6 +233,7 @@ namespace AditusBelli.EditorTools
             col.radius = 0.3f;
 
             var unit = go.AddComponent<Unit>();
+            go.AddComponent<Villager>(); // starting units are villagers in this phase
 
             var ringGo = new GameObject("SelectionRing");
             ringGo.transform.SetParent(go.transform);
@@ -267,6 +276,75 @@ namespace AditusBelli.EditorTools
 
                 go.AddComponent<GridObstacle>();
             }
+        }
+
+        private static void BuildEconomy(Grid grid)
+        {
+            // Town Center: drop-off point. Placeholder 1x1 footprint for now;
+            // proper multi-tile building footprints come in Phase 3.
+            Sprite tcSprite = CreateOrLoadSprite(
+                "town_center",
+                () => MakeDiamondTexture(256, 128, new Color32(200, 170, 120, 255)),
+                ppu: 256f);
+
+            var tc = new GameObject("Town Center");
+            Vector3 tcPos = grid.GetCellCenterWorld(new Vector3Int(-3, 0, 0));
+            tcPos.z = 0f;
+            tc.transform.position = tcPos;
+            tc.transform.localScale = new Vector3(1.6f, 1.6f, 1f);
+            var tcSr = tc.AddComponent<SpriteRenderer>();
+            tcSr.sprite = tcSprite;
+            tcSr.sortingOrder = 2;
+            tc.AddComponent<GridObstacle>();   // 1x1 footprint
+            tc.AddComponent<ResourceDropoff>();
+
+            // Trees (Wood).
+            Sprite treeSprite = CreateOrLoadSprite(
+                "res_tree",
+                () => MakeCircleTexture(64, new Color32(46, 110, 56, 255), new Color32(24, 60, 30, 255)),
+                ppu: 70f);
+            var forest = new GameObject("Forest");
+            Vector3Int[] trees =
+            {
+                new Vector3Int(-7, 1, 0), new Vector3Int(-7, 0, 0), new Vector3Int(-7, -1, 0),
+                new Vector3Int(-6, 1, 0), new Vector3Int(-6, 0, 0), new Vector3Int(-6, -1, 0),
+            };
+            foreach (Vector3Int c in trees)
+                CreateResourceNode(forest.transform, treeSprite, grid, c, ResourceType.Wood, 100f, "Tree");
+
+            // Berry bushes (Food).
+            Sprite bushSprite = CreateOrLoadSprite(
+                "res_bush",
+                () => MakeCircleTexture(48, new Color32(196, 64, 78, 255), new Color32(110, 30, 40, 255)),
+                ppu: 90f);
+            var bushes = new GameObject("Berries");
+            Vector3Int[] bushCells =
+            {
+                new Vector3Int(-3, 3, 0), new Vector3Int(-2, 3, 0), new Vector3Int(-1, 3, 0),
+            };
+            foreach (Vector3Int c in bushCells)
+                CreateResourceNode(bushes.transform, bushSprite, grid, c, ResourceType.Food, 75f, "Bush");
+        }
+
+        private static void CreateResourceNode(Transform parent, Sprite sprite, Grid grid,
+            Vector3Int cell, ResourceType type, float amount, string label)
+        {
+            var go = new GameObject($"{label}_{cell.x}_{cell.y}");
+            go.transform.SetParent(parent);
+            Vector3 p = grid.GetCellCenterWorld(cell);
+            p.z = 0f;
+            go.transform.position = p;
+
+            var sr = go.AddComponent<SpriteRenderer>();
+            sr.sprite = sprite;
+            sr.sortingOrder = 2;
+
+            var col = go.AddComponent<CircleCollider2D>();
+            col.radius = 0.4f;
+
+            var node = go.AddComponent<ResourceNode>();
+            node.resourceType = type;
+            node.amount = amount;
         }
 
         private static void SpawnUnits(GameObject prefab, Grid grid)

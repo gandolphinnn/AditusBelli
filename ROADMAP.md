@@ -9,6 +9,15 @@ Placeholder art is fine until the systems work: **mechanics first, art and
 animation later**. Each phase should end with something runnable and testable in
 Play mode.
 
+## Inspirations / references
+
+- **Age of Empires 2** — primary model: the gather → build → train → fight loop,
+  villagers and drop-off economy, buildings, ages and the tech tree.
+- **Mindustry** — resource logistics and production/automation chains, plus
+  defensive structures; ideas for supply lines and base layout.
+- **Polytopia** — minimalist, approachable design on a tile grid: streamlined
+  tech progression and tile-based expansion that keep the scope manageable.
+
 ## Architectural foundations
 
 These cut across all phases and are set up as soon as they are first needed:

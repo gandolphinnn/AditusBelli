@@ -25,6 +25,7 @@ namespace AditusBelli.Units
         private bool _hasTarget;
 
         public bool IsSelected { get; private set; }
+        public bool IsMoving => _hasTarget;
 
         private void Awake() => SetSelected(false);
 

@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 1658031652235653716}
   - component: {fileID: 6353058443669194562}
   - component: {fileID: 2282002604467524212}
+  - component: {fileID: 8059889602282469581}
   m_Layer: 0
   m_Name: Unit
   m_TagString: Untagged
@@ -146,6 +147,21 @@ MonoBehaviour:
   moveSpeed: 3
   arriveThreshold: 0.05
   selectionIndicator: {fileID: 8381323186573578232}
+--- !u!114 &8059889602282469581
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1042198797030824855}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 78c0c2e57cc835a43b3acd672d6d6b3c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AditusBelli.Economy.Villager
+  gatherRate: 5
+  carryCapacity: 10
+  interactRange: 1.2
 --- !u!1 &4263801755699956203
 GameObject:
   m_ObjectHideFlags: 0

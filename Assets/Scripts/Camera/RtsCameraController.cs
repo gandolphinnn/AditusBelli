@@ -4,29 +4,28 @@ using UnityEngine.InputSystem;
 namespace AditusBelli.CameraControl
 {
     /// <summary>
-    /// RTS-style orthographic camera:
-    /// - pan with WASD / arrow keys
-    /// - pan at screen edges
-    /// - drag with the middle mouse button
-    /// - zoom with the scroll wheel
-    /// Uses the new Input System (the only active backend in this project).
+    /// RTS-style orthographic camera. For now the only pan mechanism is the
+    /// middle-mouse drag; zoom is on the scroll wheel.
+    /// Keyboard and screen-edge panning are kept commented out below so they can
+    /// be re-enabled later if wanted.
     /// </summary>
     [RequireComponent(typeof(Camera))]
     public class RtsCameraController : MonoBehaviour
     {
-        [Header("Pan")]
-        [Tooltip("Scroll speed in units/second (at the reference zoom).")]
-        public float panSpeed = 12f;
-        [Tooltip("Thickness in pixels of the screen-edge band that triggers panning.")]
-        public float edgePanBorder = 12f;
-        public bool edgePanEnabled = true;
+        // --- Keyboard / screen-edge pan is disabled for now ---
+        // [Header("Pan")]
+        // [Tooltip("Scroll speed in units/second (at the reference zoom).")]
+        // public float panSpeed = 12f;
+        // [Tooltip("Thickness in pixels of the screen-edge band that triggers panning.")]
+        // public float edgePanBorder = 12f;
+        // public bool edgePanEnabled = true;
+        // [Tooltip("Reference orthographic size for the pan speed.")]
+        // public float referenceOrthoSize = 6f;
 
         [Header("Zoom")]
         public float zoomStep = 1f;
         public float minOrthoSize = 2f;
         public float maxOrthoSize = 16f;
-        [Tooltip("Reference orthographic size for the pan speed.")]
-        public float referenceOrthoSize = 6f;
 
         private Camera _cam;
         private Vector3 _dragOrigin;
@@ -36,11 +35,16 @@ namespace AditusBelli.CameraControl
 
         private void Update()
         {
-            HandleKeyboardAndEdgePan();
+            // Pan is middle-mouse-drag only for now; keyboard/edge panning is off.
+            // HandleKeyboardAndEdgePan();
             HandleMiddleMouseDrag();
             HandleZoom();
         }
 
+        /*
+        // Keyboard (WASD / arrows) and screen-edge panning. Disabled for now;
+        // re-enable by uncommenting this method, its call in Update(), and the
+        // Pan fields above.
         private void HandleKeyboardAndEdgePan()
         {
             Vector2 move = Vector2.zero;
@@ -71,6 +75,7 @@ namespace AditusBelli.CameraControl
             float zoomFactor = _cam.orthographicSize / referenceOrthoSize;
             transform.position += (Vector3)(move * (panSpeed * zoomFactor * Time.deltaTime));
         }
+        */
 
         private void HandleMiddleMouseDrag()
         {

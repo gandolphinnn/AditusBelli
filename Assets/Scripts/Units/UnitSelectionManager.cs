@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using AditusBelli.Economy;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -24,6 +25,10 @@ namespace AditusBelli.Units
         private static readonly List<Unit> AllUnits = new();
         private readonly List<Unit> _selected = new();
 
+        public static UnitSelectionManager Instance { get; private set; }
+        public ResourceNode SelectedNode { get; private set; }
+        public IReadOnlyList<Unit> Selected => _selected;
+
         private Camera _cam;
         private Vector2 _dragStart;
         private bool _dragging;
@@ -31,7 +36,16 @@ namespace AditusBelli.Units
         public static void Register(Unit u) { if (!AllUnits.Contains(u)) AllUnits.Add(u); }
         public static void Unregister(Unit u) => AllUnits.Remove(u);
 
-        private void Awake() => _cam = Camera.main;
+        private void Awake()
+        {
+            Instance = this;
+            _cam = Camera.main;
+        }
+
+        private void OnDestroy()
+        {
+            if (Instance == this) Instance = null;
+        }
 
         private void Update()
         {
@@ -71,16 +85,23 @@ namespace AditusBelli.Units
             Collider2D hit = Physics2D.OverlapPoint(world);
             Unit unit = hit != null ? hit.GetComponentInParent<Unit>() : null;
 
-            if (!ShiftHeld()) ClearSelection();
+            if (unit != null)
+            {
+                if (!ShiftHeld()) ClearSelection();
+                SelectedNode = null;
+                if (unit.IsSelected && ShiftHeld()) Deselect(unit);
+                else Select(unit);
+                return;
+            }
 
-            if (unit == null) return;
-
-            if (unit.IsSelected && ShiftHeld()) Deselect(unit);
-            else Select(unit);
+            // No unit under the cursor: select a resource node if any, else clear.
+            ClearSelection();
+            SelectedNode = hit != null ? hit.GetComponentInParent<ResourceNode>() : null;
         }
 
         private void HandleBoxSelect(Vector2 a, Vector2 b)
         {
+            SelectedNode = null;
             if (!ShiftHeld()) ClearSelection();
 
             Rect rect = ScreenRect(a, b);
@@ -95,9 +116,24 @@ namespace AditusBelli.Units
         {
             if (_selected.Count == 0) return;
 
-            Vector3 center = _cam.ScreenToWorldPoint(screenPos);
-            center.z = 0f;
+            Vector3 world = _cam.ScreenToWorldPoint(screenPos);
 
+            // Right-clicking a resource node sends villagers to gather it.
+            Collider2D hit = Physics2D.OverlapPoint(world);
+            ResourceNode node = hit != null ? hit.GetComponentInParent<ResourceNode>() : null;
+            if (node != null)
+            {
+                foreach (Unit u in _selected)
+                {
+                    var villager = u.GetComponent<Villager>();
+                    if (villager != null) villager.GatherFrom(node);
+                    else u.MoveTo(node.transform.position);
+                }
+                return;
+            }
+
+            // Otherwise: plain move order in formation, cancelling any gathering.
+            world.z = 0f;
             int count = _selected.Count;
             int cols = Mathf.Max(1, Mathf.CeilToInt(Mathf.Sqrt(count)));
             for (int i = 0; i < count; i++)
@@ -108,7 +144,10 @@ namespace AditusBelli.Units
                     (col - (cols - 1) * 0.5f) * formationSpacing,
                     (row - (cols - 1) * 0.5f) * formationSpacing * 0.5f, // compressed for isometric
                     0f);
-                _selected[i].MoveTo(center + offset);
+
+                var villager = _selected[i].GetComponent<Villager>();
+                if (villager != null) villager.StopGathering();
+                _selected[i].MoveTo(world + offset);
             }
         }
 
@@ -128,6 +167,7 @@ namespace AditusBelli.Units
         {
             foreach (Unit u in _selected) u.SetSelected(false);
             _selected.Clear();
+            SelectedNode = null;
         }
 
         private static Rect ScreenRect(Vector2 a, Vector2 b)
