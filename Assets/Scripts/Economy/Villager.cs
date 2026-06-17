@@ -1,47 +1,61 @@
+using AditusBelli.Buildings;
 using AditusBelli.Units;
 using UnityEngine;
 
 namespace AditusBelli.Economy
 {
     /// <summary>
-    /// Gatherer behaviour: walk to a resource node, harvest up to the carry
-    /// capacity, return to the nearest drop-off, deposit, and repeat until the
-    /// node is depleted (then move to the nearest node of the same type).
-    /// Drives movement through the <see cref="Unit"/> component.
+    /// Villager behaviour: gathers resources (walk → harvest → return → deposit →
+    /// repeat) and constructs buildings (walk → add work until complete). Drives
+    /// movement through the <see cref="Unit"/> component.
     /// </summary>
     [RequireComponent(typeof(Unit))]
     public class Villager : MonoBehaviour
     {
-        public float gatherRate = 5f;      // units per second
-        public float carryCapacity = 10f;
-        public float interactRange = 1.2f; // world distance to count as "at" a target
+        public float gatherRate = 5f;      // resource units per second
+        public int carryCapacity = 10;
+        public float buildRate = 1f;       // build-seconds added per second
+        public float interactRange = 2.2f; // reach for nodes, drop-offs and buildings
 
-        private enum State { Idle, ToResource, Gathering, ToDropoff }
+        private enum State { Idle, ToResource, Gathering, ToDropoff, ToBuild, Building }
 
         private Unit _unit;
         private State _state = State.Idle;
         private ResourceNode _node;
-        private float _carried;
+        private Building _buildTarget;
+        private int _carried;
+        private float _gatherAccumulator;
         private ResourceType _carriedType;
 
-        public float CarriedAmount => _carried;
+        public int CarriedAmount => _carried;
         public ResourceType CarriedType => _carriedType;
-        public float CarryCapacity => carryCapacity;
+        public int CarryCapacity => carryCapacity;
 
         private void Awake() => _unit = GetComponent<Unit>();
 
         public void GatherFrom(ResourceNode node)
         {
             if (node == null) return;
+            _buildTarget = null;
             _node = node;
             _state = State.ToResource;
             _unit.MoveTo(node.transform.position);
         }
 
-        public void StopGathering()
+        public void BuildAt(Building building)
+        {
+            if (building == null || building.IsComplete) return;
+            _node = null;
+            _buildTarget = building;
+            _state = State.ToBuild;
+            _unit.MoveTo(building.transform.position);
+        }
+
+        public void StopTasks()
         {
             _state = State.Idle;
             _node = null;
+            _buildTarget = null;
         }
 
         private void Update()
@@ -51,8 +65,12 @@ namespace AditusBelli.Economy
                 case State.ToResource: TickToResource(); break;
                 case State.Gathering: TickGathering(); break;
                 case State.ToDropoff: TickToDropoff(); break;
+                case State.ToBuild: TickToBuild(); break;
+                case State.Building: TickBuilding(); break;
             }
         }
+
+        // --- Gathering ---
 
         private void TickToResource()
         {
@@ -64,7 +82,7 @@ namespace AditusBelli.Economy
             }
 
             if (_unit.IsMoving) return;
-            _state = Near(_node.transform.position) ? State.Gathering : State.Idle;
+            _state = Near(_node.transform.position, interactRange) ? State.Gathering : State.Idle;
         }
 
         private void TickGathering()
@@ -72,7 +90,20 @@ namespace AditusBelli.Economy
             if (_node == null || _node.IsDepleted) { GoDeposit(); return; }
 
             _carriedType = _node.resourceType;
-            _carried += _node.Extract(gatherRate * Time.deltaTime);
+
+            // Gather whole units at the gather rate, so resource totals stay exact.
+            _gatherAccumulator += gatherRate * Time.deltaTime;
+            int units = Mathf.FloorToInt(_gatherAccumulator);
+            if (units > 0)
+            {
+                int request = Mathf.Min(units, carryCapacity - _carried);
+                if (request > 0)
+                {
+                    int taken = _node.Extract(request);
+                    _carried += taken;
+                    _gatherAccumulator -= taken;
+                }
+            }
 
             if (_carried >= carryCapacity || _node == null || _node.IsDepleted)
                 GoDeposit();
@@ -84,7 +115,7 @@ namespace AditusBelli.Economy
             if (drop == null) { _state = State.Idle; return; }
             if (_unit.IsMoving) return;
 
-            if (!Near(drop.transform.position)) { _state = State.Idle; return; }
+            if (!Near(drop.transform.position, interactRange)) { _state = State.Idle; return; }
 
             Deposit();
 
@@ -118,18 +149,35 @@ namespace AditusBelli.Economy
 
         private void Deposit()
         {
-            int whole = Mathf.FloorToInt(_carried);
-            if (whole > 0 && PlayerResources.Instance != null)
-                PlayerResources.Instance.Add(_carriedType, whole);
-            _carried -= whole;
+            if (_carried > 0 && PlayerResources.Instance != null)
+                PlayerResources.Instance.Add(_carriedType, _carried);
+            _carried = 0;
         }
 
-        private bool Near(Vector3 p)
+        // --- Construction ---
+
+        private void TickToBuild()
+        {
+            if (_buildTarget == null || _buildTarget.IsComplete) { _state = State.Idle; return; }
+            if (_unit.IsMoving) return;
+            _state = Near(_buildTarget.transform.position, interactRange) ? State.Building : State.Idle;
+        }
+
+        private void TickBuilding()
+        {
+            if (_buildTarget == null || _buildTarget.IsComplete) { _state = State.Idle; return; }
+            _buildTarget.AddWork(buildRate * Time.deltaTime);
+            if (_buildTarget.IsComplete) _state = State.Idle;
+        }
+
+        // --- Helpers ---
+
+        private bool Near(Vector3 p, float range)
         {
             Vector3 a = transform.position;
             a.z = 0f;
             p.z = 0f;
-            return (a - p).sqrMagnitude <= interactRange * interactRange;
+            return (a - p).sqrMagnitude <= range * range;
         }
 
         private ResourceNode NearestNode(ResourceType type)

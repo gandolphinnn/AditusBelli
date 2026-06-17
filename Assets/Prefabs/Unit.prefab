@@ -161,7 +161,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AditusBelli.Economy.Villager
   gatherRate: 5
   carryCapacity: 10
-  interactRange: 1.2
+  buildRate: 1
+  interactRange: 2.2
 --- !u!1 &4263801755699956203
 GameObject:
   m_ObjectHideFlags: 0

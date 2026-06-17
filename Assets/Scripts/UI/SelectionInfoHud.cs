@@ -1,4 +1,5 @@
 using System.Text;
+using AditusBelli.Buildings;
 using AditusBelli.Economy;
 using AditusBelli.Units;
 using UnityEngine;
@@ -6,9 +7,10 @@ using UnityEngine;
 namespace AditusBelli.UI
 {
     /// <summary>
-    /// Bottom-left panel describing the current selection: a single villager's
-    /// carried inventory, a resource node's remaining amount, or a summary for a
-    /// multi-unit selection. IMGUI placeholder until the proper uGUI HUD (Phase 7).
+    /// Bottom-left panel describing the current selection: a building's type and
+    /// construction progress, a resource node's remaining amount, a single
+    /// villager's carried inventory, or a multi-unit summary. IMGUI placeholder
+    /// until the proper uGUI HUD (Phase 7).
     /// </summary>
     public class SelectionInfoHud : MonoBehaviour
     {
@@ -24,16 +26,34 @@ namespace AditusBelli.UI
 
             _style ??= new GUIStyle(GUI.skin.label) { fontSize = 13, wordWrap = true };
 
-            var rect = new Rect(8, Screen.height - 64, 420, 56);
+            var rect = new Rect(8, Screen.height - 78, 420, 70);
             GUI.Box(rect, GUIContent.none);
             GUI.Label(new Rect(rect.x + 8, rect.y + 6, rect.width - 16, rect.height - 12), text, _style);
         }
 
         private static string BuildInfo(UnitSelectionManager sm)
         {
+            Building building = sm.SelectedBuilding;
+            if (building != null)
+            {
+                string name = building.Def != null ? building.Def.displayName : "Building";
+
+                if (!building.IsComplete)
+                    return $"{name} (under construction)\n{Mathf.RoundToInt(building.Progress * 100f)}% complete";
+
+                var info = new StringBuilder(name);
+                if (building.Def != null)
+                {
+                    if (building.Def.isDropoff) info.Append("\nResource drop-off");
+                    if (building.Def.populationProvided > 0)
+                        info.Append($"\n+{building.Def.populationProvided} population");
+                }
+                return info.ToString();
+            }
+
             ResourceNode node = sm.SelectedNode;
             if (node != null)
-                return $"{node.resourceType} source\nRemaining: {Mathf.CeilToInt(node.amount)}";
+                return $"{node.resourceType} source\nRemaining: {node.amount}";
 
             var selection = sm.Selected;
             if (selection.Count == 0) return null;
@@ -43,11 +63,11 @@ namespace AditusBelli.UI
                 var villager = selection[0].GetComponent<Villager>();
                 if (villager == null) return "Unit selected";
 
-                if (villager.CarriedAmount > 0.01f)
-                    return $"Villager\nCarrying: {Mathf.FloorToInt(villager.CarriedAmount)}/" +
-                           $"{Mathf.RoundToInt(villager.CarryCapacity)} {villager.CarriedType}";
+                if (villager.CarriedAmount > 0)
+                    return $"Villager\nCarrying: {villager.CarriedAmount}/" +
+                           $"{villager.CarryCapacity} {villager.CarriedType}";
 
-                return $"Villager\nInventory empty (capacity {Mathf.RoundToInt(villager.CarryCapacity)})";
+                return $"Villager\nInventory empty (capacity {villager.CarryCapacity})";
             }
 
             // Multiple units: count + aggregated carried amounts per resource type.
@@ -55,8 +75,8 @@ namespace AditusBelli.UI
             foreach (Unit u in selection)
             {
                 var villager = u.GetComponent<Villager>();
-                if (villager == null || villager.CarriedAmount <= 0.01f) continue;
-                totals[(int)villager.CarriedType] += Mathf.FloorToInt(villager.CarriedAmount);
+                if (villager == null || villager.CarriedAmount <= 0) continue;
+                totals[(int)villager.CarriedType] += villager.CarriedAmount;
             }
 
             var sb = new StringBuilder();

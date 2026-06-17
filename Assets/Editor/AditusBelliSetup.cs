@@ -1,4 +1,5 @@
 using System.IO;
+using AditusBelli.Buildings;
 using AditusBelli.CameraControl;
 using AditusBelli.Economy;
 using AditusBelli.Map;
@@ -107,8 +108,8 @@ namespace AditusBelli.EditorTools
             // Logical grid + pathfinding bridge (auto-finds the ground tilemap child).
             gridGo.AddComponent<GameGrid>();
 
-            // Static obstacles: a wall with a gap, to demonstrate pathfinding.
-            BuildObstacles(grid);
+            // Walls: completed "Wall" buildings forming a barrier with a gap.
+            BuildWalls(grid);
 
             // --- Units + selection system ---
             GameObject unitPrefab = BuildUnitPrefab();
@@ -116,9 +117,17 @@ namespace AditusBelli.EditorTools
 
             var systemsGo = new GameObject("Game Systems");
             systemsGo.AddComponent<UnitSelectionManager>();
-            systemsGo.AddComponent<PlayerResources>();
+
+            var resources = systemsGo.AddComponent<PlayerResources>();
+            resources.startWood = 150; // enough to try construction right away
+            resources.startFood = 50;
+
+            systemsGo.AddComponent<PlayerPopulation>();
             systemsGo.AddComponent<ResourceHud>();
             systemsGo.AddComponent<SelectionInfoHud>();
+
+            var placer = systemsGo.AddComponent<BuildingPlacer>();
+            placer.houseDef = CreateHouseDef();
 
             // Economy: drop-off building and resource nodes.
             BuildEconomy(grid);
@@ -250,53 +259,142 @@ namespace AditusBelli.EditorTools
             return prefab;
         }
 
-        private static void BuildObstacles(Grid grid)
+        private static void BuildWalls(Grid grid)
         {
-            Sprite rock = CreateOrLoadSprite(
-                "obstacle_rock",
-                () => MakeDiamondTexture(256, 128, new Color32(90, 84, 78, 255)),
-                ppu: 256f);
-
-            var container = new GameObject("Obstacles");
+            BuildingDef wallDef = CreateWallDef();
+            var container = new GameObject("Walls");
 
             // Vertical wall at x = 5, with a gap at y = 0 so units must funnel through.
             int[] wallYs = { -3, -2, -1, 1, 2, 3 };
             foreach (int y in wallYs)
+                CreateBuilding(wallDef, new Vector3Int(5, y, 0), grid,
+                    completed: true, scale: 1f, parent: container.transform);
+        }
+
+        private static BuildingDef CreateWallDef()
+        {
+            EnsureFolder("Assets/Data");
+            EnsureFolder("Assets/Data/Buildings");
+
+            Sprite sprite = CreateOrLoadSprite(
+                "obstacle_rock",
+                () => MakeDiamondTexture(256, 128, new Color32(90, 84, 78, 255)),
+                ppu: 256f);
+
+            const string path = "Assets/Data/Buildings/Wall.asset";
+            var def = AssetDatabase.LoadAssetAtPath<BuildingDef>(path);
+            if (def == null)
             {
-                var cell = new Vector3Int(5, y, 0);
-                var go = new GameObject($"Rock_5_{y}");
-                go.transform.SetParent(container.transform);
-                Vector3 p = grid.GetCellCenterWorld(cell);
-                p.z = 0f;
-                go.transform.position = p;
-
-                var sr = go.AddComponent<SpriteRenderer>();
-                sr.sprite = rock;
-                sr.sortingOrder = 2; // same band as units; isometric Y-sort handles occlusion
-
-                go.AddComponent<GridObstacle>();
+                def = ScriptableObject.CreateInstance<BuildingDef>();
+                AssetDatabase.CreateAsset(def, path);
             }
+
+            def.displayName = "Wall";
+            def.footprint = new Vector2Int(1, 1);
+            def.woodCost = 5;
+            def.buildTime = 3f;
+            def.populationProvided = 0;
+            def.isDropoff = false;
+            def.sprite = sprite;
+            EditorUtility.SetDirty(def);
+            AssetDatabase.SaveAssets();
+            return def;
+        }
+
+        private static BuildingDef CreateHouseDef()
+        {
+            EnsureFolder("Assets/Data");
+            EnsureFolder("Assets/Data/Buildings");
+
+            Sprite houseSprite = CreateOrLoadSprite(
+                "building_house",
+                () => MakeDiamondTexture(512, 256, new Color32(150, 96, 70, 255)),
+                ppu: 256f);
+
+            const string path = "Assets/Data/Buildings/House.asset";
+            var def = AssetDatabase.LoadAssetAtPath<BuildingDef>(path);
+            if (def == null)
+            {
+                def = ScriptableObject.CreateInstance<BuildingDef>();
+                AssetDatabase.CreateAsset(def, path);
+            }
+
+            def.displayName = "House";
+            def.footprint = new Vector2Int(2, 2);
+            def.woodCost = 50;
+            def.buildTime = 8f;
+            def.populationProvided = 5;
+            def.isDropoff = false;
+            def.sprite = houseSprite;
+            EditorUtility.SetDirty(def);
+            AssetDatabase.SaveAssets();
+            return def;
+        }
+
+        private static BuildingDef CreateTownCenterDef()
+        {
+            EnsureFolder("Assets/Data");
+            EnsureFolder("Assets/Data/Buildings");
+
+            Sprite sprite = CreateOrLoadSprite(
+                "building_town_center",
+                () => MakeDiamondTexture(512, 256, new Color32(200, 170, 120, 255)),
+                ppu: 256f);
+
+            const string path = "Assets/Data/Buildings/TownCenter.asset";
+            var def = AssetDatabase.LoadAssetAtPath<BuildingDef>(path);
+            if (def == null)
+            {
+                def = ScriptableObject.CreateInstance<BuildingDef>();
+                AssetDatabase.CreateAsset(def, path);
+            }
+
+            def.displayName = "Town Center";
+            def.footprint = new Vector2Int(2, 2);
+            def.woodCost = 0;
+            def.buildTime = 1f;
+            def.populationProvided = 0;
+            def.isDropoff = true;
+            def.sprite = sprite;
+            EditorUtility.SetDirty(def);
+            AssetDatabase.SaveAssets();
+            return def;
+        }
+
+        private static void CreateBuilding(BuildingDef def, Vector3Int originCell, Grid grid,
+            bool completed, float scale, Transform parent)
+        {
+            var go = new GameObject(def.displayName);
+            if (parent != null) go.transform.SetParent(parent);
+
+            Vector3 a = grid.GetCellCenterWorld(originCell);
+            Vector3 b = grid.GetCellCenterWorld(new Vector3Int(
+                originCell.x + Mathf.Max(1, def.footprint.x) - 1,
+                originCell.y + Mathf.Max(1, def.footprint.y) - 1, 0));
+            Vector3 center = (a + b) * 0.5f;
+            center.z = 0f;
+            go.transform.position = center;
+            if (!Mathf.Approximately(scale, 1f))
+                go.transform.localScale = new Vector3(scale, scale, 1f);
+
+            var sr = go.AddComponent<SpriteRenderer>();
+            sr.sprite = def.sprite;
+            sr.sortingOrder = 2;
+
+            var col = go.AddComponent<CircleCollider2D>();
+            col.radius = 0.4f * Mathf.Max(1, Mathf.Max(def.footprint.x, def.footprint.y));
+
+            var building = go.AddComponent<Building>();
+            building.def = def;
+            building.originCell = new Vector2Int(originCell.x, originCell.y);
+            building.startCompleted = completed;
         }
 
         private static void BuildEconomy(Grid grid)
         {
-            // Town Center: drop-off point. Placeholder 1x1 footprint for now;
-            // proper multi-tile building footprints come in Phase 3.
-            Sprite tcSprite = CreateOrLoadSprite(
-                "town_center",
-                () => MakeDiamondTexture(256, 128, new Color32(200, 170, 120, 255)),
-                ppu: 256f);
-
-            var tc = new GameObject("Town Center");
-            Vector3 tcPos = grid.GetCellCenterWorld(new Vector3Int(-3, 0, 0));
-            tcPos.z = 0f;
-            tc.transform.position = tcPos;
-            tc.transform.localScale = new Vector3(1.6f, 1.6f, 1f);
-            var tcSr = tc.AddComponent<SpriteRenderer>();
-            tcSr.sprite = tcSprite;
-            tcSr.sortingOrder = 2;
-            tc.AddComponent<GridObstacle>();   // 1x1 footprint
-            tc.AddComponent<ResourceDropoff>();
+            // Town Center: completed 2x2 building acting as a resource drop-off.
+            CreateBuilding(CreateTownCenterDef(), new Vector3Int(-3, 0, 0), grid,
+                completed: true, scale: 1f, parent: null);
 
             // Trees (Wood).
             Sprite treeSprite = CreateOrLoadSprite(
@@ -310,7 +408,7 @@ namespace AditusBelli.EditorTools
                 new Vector3Int(-6, 1, 0), new Vector3Int(-6, 0, 0), new Vector3Int(-6, -1, 0),
             };
             foreach (Vector3Int c in trees)
-                CreateResourceNode(forest.transform, treeSprite, grid, c, ResourceType.Wood, 100f, "Tree");
+                CreateResourceNode(forest.transform, treeSprite, grid, c, ResourceType.Wood, 100, "Tree");
 
             // Berry bushes (Food).
             Sprite bushSprite = CreateOrLoadSprite(
@@ -323,11 +421,11 @@ namespace AditusBelli.EditorTools
                 new Vector3Int(-3, 3, 0), new Vector3Int(-2, 3, 0), new Vector3Int(-1, 3, 0),
             };
             foreach (Vector3Int c in bushCells)
-                CreateResourceNode(bushes.transform, bushSprite, grid, c, ResourceType.Food, 75f, "Bush");
+                CreateResourceNode(bushes.transform, bushSprite, grid, c, ResourceType.Food, 75, "Bush");
         }
 
         private static void CreateResourceNode(Transform parent, Sprite sprite, Grid grid,
-            Vector3Int cell, ResourceType type, float amount, string label)
+            Vector3Int cell, ResourceType type, int amount, string label)
         {
             var go = new GameObject($"{label}_{cell.x}_{cell.y}");
             go.transform.SetParent(parent);

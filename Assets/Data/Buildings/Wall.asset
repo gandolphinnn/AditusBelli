@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b852604a063ef6a4bb73201a3db4e93d, type: 3}
+  m_Name: Wall
+  m_EditorClassIdentifier: Assembly-CSharp::AditusBelli.Buildings.BuildingDef
+  displayName: Wall
+  footprint: {x: 1, y: 1}
+  woodCost: 5
+  buildTime: 3
+  populationProvided: 0
+  isDropoff: 0
+  sprite: {fileID: 21300000, guid: e14fef2fae724594c866fab2e87aced8, type: 3}

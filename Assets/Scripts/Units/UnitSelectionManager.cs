@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using AditusBelli.Buildings;
 using AditusBelli.Economy;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -27,7 +28,9 @@ namespace AditusBelli.Units
 
         public static UnitSelectionManager Instance { get; private set; }
         public ResourceNode SelectedNode { get; private set; }
+        public Building SelectedBuilding { get; private set; }
         public IReadOnlyList<Unit> Selected => _selected;
+        public static int UnitCount => AllUnits.Count;
 
         private Camera _cam;
         private Vector2 _dragStart;
@@ -52,6 +55,7 @@ namespace AditusBelli.Units
             if (_cam == null) _cam = Camera.main;
             var mouse = Mouse.current;
             if (_cam == null || mouse == null) return;
+            if (BuildingPlacer.IsActive) return; // building placement consumes input
 
             if (mouse.leftButton.wasPressedThisFrame)
             {
@@ -89,19 +93,23 @@ namespace AditusBelli.Units
             {
                 if (!ShiftHeld()) ClearSelection();
                 SelectedNode = null;
+                SelectedBuilding = null;
                 if (unit.IsSelected && ShiftHeld()) Deselect(unit);
                 else Select(unit);
                 return;
             }
 
-            // No unit under the cursor: select a resource node if any, else clear.
+            // No unit under the cursor: inspect a resource node or a building, else clear.
             ClearSelection();
             SelectedNode = hit != null ? hit.GetComponentInParent<ResourceNode>() : null;
+            if (SelectedNode == null)
+                SelectedBuilding = hit != null ? hit.GetComponentInParent<Building>() : null;
         }
 
         private void HandleBoxSelect(Vector2 a, Vector2 b)
         {
             SelectedNode = null;
+            SelectedBuilding = null;
             if (!ShiftHeld()) ClearSelection();
 
             Rect rect = ScreenRect(a, b);
@@ -118,8 +126,9 @@ namespace AditusBelli.Units
 
             Vector3 world = _cam.ScreenToWorldPoint(screenPos);
 
-            // Right-clicking a resource node sends villagers to gather it.
             Collider2D hit = Physics2D.OverlapPoint(world);
+
+            // Right-clicking a resource node sends villagers to gather it.
             ResourceNode node = hit != null ? hit.GetComponentInParent<ResourceNode>() : null;
             if (node != null)
             {
@@ -132,7 +141,20 @@ namespace AditusBelli.Units
                 return;
             }
 
-            // Otherwise: plain move order in formation, cancelling any gathering.
+            // Right-clicking an unfinished building sends villagers to build it.
+            Building building = hit != null ? hit.GetComponentInParent<Building>() : null;
+            if (building != null && !building.IsComplete)
+            {
+                foreach (Unit u in _selected)
+                {
+                    var villager = u.GetComponent<Villager>();
+                    if (villager != null) villager.BuildAt(building);
+                    else u.MoveTo(building.transform.position);
+                }
+                return;
+            }
+
+            // Otherwise: plain move order in formation, cancelling current tasks.
             world.z = 0f;
             int count = _selected.Count;
             int cols = Mathf.Max(1, Mathf.CeilToInt(Mathf.Sqrt(count)));
@@ -146,7 +168,7 @@ namespace AditusBelli.Units
                     0f);
 
                 var villager = _selected[i].GetComponent<Villager>();
-                if (villager != null) villager.StopGathering();
+                if (villager != null) villager.StopTasks();
                 _selected[i].MoveTo(world + offset);
             }
         }
@@ -168,6 +190,7 @@ namespace AditusBelli.Units
             foreach (Unit u in _selected) u.SetSelected(false);
             _selected.Clear();
             SelectedNode = null;
+            SelectedBuilding = null;
         }
 
         private static Rect ScreenRect(Vector2 a, Vector2 b)

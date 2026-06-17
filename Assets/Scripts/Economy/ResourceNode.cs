@@ -11,14 +11,14 @@ namespace AditusBelli.Economy
     public class ResourceNode : MonoBehaviour
     {
         public ResourceType resourceType = ResourceType.Wood;
-        public float amount = 100f;
+        public int amount = 100;
 
         public static readonly List<ResourceNode> All = new();
 
         private Vector2Int _cell;
         private bool _blocked;
 
-        public bool IsDepleted => amount <= 0f;
+        public bool IsDepleted => amount <= 0;
 
         private void OnEnable() => All.Add(this);
         private void OnDisable() => All.Remove(this);
@@ -34,12 +34,12 @@ namespace AditusBelli.Economy
             _blocked = true;
         }
 
-        /// <summary>Removes up to 'requested' units and returns the amount actually taken.</summary>
-        public float Extract(float requested)
+        /// <summary>Removes up to 'requested' whole units and returns how many were actually taken.</summary>
+        public int Extract(int requested)
         {
-            float taken = Mathf.Min(requested, amount);
+            int taken = Mathf.Min(requested, amount);
             amount -= taken;
-            if (amount <= 0f) Deplete();
+            if (amount <= 0) Deplete();
             return taken;
         }
 
