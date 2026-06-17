@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using AditusBelli.Economy;
 using AditusBelli.Map;
+using AditusBelli.Teams;
 using AditusBelli.Units;
 using UnityEngine;
 
@@ -18,6 +19,7 @@ namespace AditusBelli.Buildings
 
         private readonly List<UnitDef> _queue = new();
         private Building _building;
+        private TeamDef _ownerTeam;
         private float _progress;
         private Vector3 _rallyPoint;
         private bool _hasRally;
@@ -27,7 +29,12 @@ namespace AditusBelli.Buildings
         public bool HasRally => _hasRally;
         public UnitDef FirstTrainable => (trainable != null && trainable.Length > 0) ? trainable[0] : null;
 
-        private void Awake() => _building = GetComponent<Building>();
+        private void Awake()
+        {
+            _building = GetComponent<Building>();
+            var owner = GetComponent<Owner>();
+            _ownerTeam = owner != null ? owner.Team : null;
+        }
 
         public void SetRallyPoint(Vector3 worldPos)
         {
@@ -43,7 +50,7 @@ namespace AditusBelli.Buildings
 
             PlayerPopulation pop = PlayerPopulation.Instance;
             if (pop != null &&
-                UnitSelectionManager.UnitCount + _queue.Count + def.populationCost > pop.Cap)
+                UnitSelectionManager.UnitCountForTeam(_ownerTeam) + _queue.Count + def.populationCost > pop.Cap)
                 return false; // would exceed the population cap
 
             PlayerResources res = PlayerResources.Instance;
@@ -97,6 +104,9 @@ namespace AditusBelli.Buildings
 
             Vector3 spawn = ComputeSpawnPoint();
             GameObject go = Instantiate(def.prefab, spawn, Quaternion.identity);
+
+            var spawnedOwner = go.GetComponent<Owner>();
+            if (spawnedOwner != null && _ownerTeam != null) spawnedOwner.team = _ownerTeam;
 
             if (_hasRally)
             {

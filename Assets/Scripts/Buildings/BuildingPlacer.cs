@@ -1,5 +1,7 @@
+using AditusBelli.Combat;
 using AditusBelli.Economy;
 using AditusBelli.Map;
+using AditusBelli.Teams;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -18,6 +20,7 @@ namespace AditusBelli.Buildings
         public static bool IsActive { get; private set; }
 
         public BuildingDef houseDef;
+        public BuildingDef barracksDef;
 
         private Camera _cam;
         private BuildingDef _placing;
@@ -54,8 +57,11 @@ namespace AditusBelli.Buildings
 
             if (!IsActive)
             {
-                if (keyboard != null && keyboard.hKey.wasPressedThisFrame && houseDef != null)
-                    BeginPlacement(houseDef);
+                if (keyboard != null)
+                {
+                    if (keyboard.hKey.wasPressedThisFrame && houseDef != null) BeginPlacement(houseDef);
+                    else if (keyboard.bKey.wasPressedThisFrame && barracksDef != null) BeginPlacement(barracksDef);
+                }
                 return;
             }
 
@@ -114,6 +120,13 @@ namespace AditusBelli.Buildings
             var col = go.AddComponent<CircleCollider2D>();
             col.radius = 0.7f;
 
+            var owner = go.AddComponent<Owner>();
+            owner.team = TeamManager.Instance != null ? TeamManager.Instance.LocalPlayer : null;
+            owner.applyTeamColor = false;
+
+            var health = go.AddComponent<Health>();
+            health.Init(def.maxHealth);
+
             var building = go.AddComponent<Building>();
             building.def = def;
             building.originCell = origin;
@@ -151,12 +164,21 @@ namespace AditusBelli.Buildings
 
         private void OnGUI()
         {
-            string hint = IsActive
-                ? "Placing: left-click to build    -    right-click / Esc to cancel"
-                : (houseDef != null ? $"Press H to build a House ({houseDef.woodCost} Wood)" : string.Empty);
+            string hint;
+            if (IsActive)
+            {
+                hint = "Placing: left-click to build    -    right-click / Esc to cancel";
+            }
+            else
+            {
+                hint = string.Empty;
+                if (houseDef != null) hint += $"Press H: House ({houseDef.woodCost} Wood)";
+                if (barracksDef != null)
+                    hint += (hint.Length > 0 ? "    -    " : "") + $"Press B: Barracks ({barracksDef.woodCost} Wood)";
+            }
 
             if (hint.Length > 0)
-                GUI.Label(new Rect(8, 44, 460, 22), hint);
+                GUI.Label(new Rect(8, 44, 620, 22), hint);
         }
     }
 }

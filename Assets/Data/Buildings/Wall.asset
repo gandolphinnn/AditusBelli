@@ -18,4 +18,6 @@ MonoBehaviour:
   buildTime: 3
   populationProvided: 0
   isDropoff: 0
+  maxHealth: 0
+  trains: []
   sprite: {fileID: 21300000, guid: e14fef2fae724594c866fab2e87aced8, type: 3}

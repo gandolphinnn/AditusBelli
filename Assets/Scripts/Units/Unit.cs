@@ -63,6 +63,13 @@ namespace AditusBelli.Units
             _hasTarget = true;
         }
 
+        public void Stop()
+        {
+            _hasTarget = false;
+            _path.Clear();
+            _pathIndex = 0;
+        }
+
         private void Update()
         {
             if (!_hasTarget) return;

@@ -1,3 +1,4 @@
+using AditusBelli.Units;
 using UnityEngine;
 
 namespace AditusBelli.Buildings
@@ -15,6 +16,8 @@ namespace AditusBelli.Buildings
 
         public int populationProvided = 0;
         public bool isDropoff = false;
+        public int maxHealth = 200;
+        public UnitDef[] trains;
         public Sprite sprite;
     }
 }

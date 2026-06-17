@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using AditusBelli.Buildings;
+using AditusBelli.Combat;
 using AditusBelli.Economy;
+using AditusBelli.Teams;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -29,15 +31,32 @@ namespace AditusBelli.Units
         public static UnitSelectionManager Instance { get; private set; }
         public ResourceNode SelectedNode { get; private set; }
         public Building SelectedBuilding { get; private set; }
+        public Unit SelectedUnit { get; private set; } // single inspected unit (any owner), not command-selected
         public IReadOnlyList<Unit> Selected => _selected;
-        public static int UnitCount => AllUnits.Count;
+        public static int UnitCountForTeam(TeamDef team)
+        {
+            if (team == null) return AllUnits.Count;
+            int count = 0;
+            foreach (Unit u in AllUnits)
+            {
+                if (u == null) continue;
+                var owner = u.GetComponent<Owner>();
+                if (owner != null && owner.Team == team) count++;
+            }
+            return count;
+        }
 
         private Camera _cam;
         private Vector2 _dragStart;
         private bool _dragging;
 
         public static void Register(Unit u) { if (!AllUnits.Contains(u)) AllUnits.Add(u); }
-        public static void Unregister(Unit u) => AllUnits.Remove(u);
+
+        public static void Unregister(Unit u)
+        {
+            AllUnits.Remove(u);
+            if (Instance != null) Instance._selected.Remove(u); // drop destroyed units from the selection
+        }
 
         private void Awake()
         {
@@ -52,6 +71,8 @@ namespace AditusBelli.Units
 
         private void Update()
         {
+            _selected.RemoveAll(u => u == null); // drop any destroyed units from the selection
+
             if (_cam == null) _cam = Camera.main;
             var mouse = Mouse.current;
             if (_cam == null || mouse == null) return;
@@ -83,38 +104,76 @@ namespace AditusBelli.Units
             return kb != null && (kb.leftShiftKey.isPressed || kb.rightShiftKey.isPressed);
         }
 
+        private static bool IsLocalPlayerUnit(Unit u)
+        {
+            if (u == null) return false;
+            var owner = u.GetComponent<Owner>();
+            return owner != null && TeamManager.Instance != null && owner.Team == TeamManager.Instance.LocalPlayer;
+        }
+
+        private static bool IsMobile(Unit u)
+        {
+            var combatant = u.GetComponent<Combatant>();
+            return combatant == null || combatant.mobile;
+        }
+
+        // Only the player's own mobile units can be multi-selected (Shift / box).
+        private static bool IsMultiSelectable(Unit u) => IsLocalPlayerUnit(u) && IsMobile(u);
+
+        private static bool IsEnemy(Health h)
+        {
+            var owner = h.GetComponent<Owner>();
+            return owner != null && TeamManager.Instance != null && owner.Team != TeamManager.Instance.LocalPlayer;
+        }
+
         private void HandleSingleClick(Vector2 screenPos)
         {
             Vector3 world = _cam.ScreenToWorldPoint(screenPos);
             Collider2D hit = Physics2D.OverlapPoint(world);
             Unit unit = hit != null ? hit.GetComponentInParent<Unit>() : null;
 
-            if (unit != null)
+            // Shift only toggles multi-selection of the player's own mobile units.
+            if (ShiftHeld())
             {
-                if (!ShiftHeld()) ClearSelection();
-                SelectedNode = null;
-                SelectedBuilding = null;
-                if (unit.IsSelected && ShiftHeld()) Deselect(unit);
-                else Select(unit);
+                if (unit != null && IsMultiSelectable(unit))
+                {
+                    SelectedNode = null;
+                    SelectedBuilding = null;
+                    SelectedUnit = null;
+                    if (unit.IsSelected) Deselect(unit);
+                    else Select(unit);
+                }
                 return;
             }
 
-            // No unit under the cursor: inspect a resource node or a building, else clear.
+            // Plain single click: clear, then inspect whatever is under the cursor.
             ClearSelection();
-            SelectedNode = hit != null ? hit.GetComponentInParent<ResourceNode>() : null;
-            if (SelectedNode == null)
-                SelectedBuilding = hit != null ? hit.GetComponentInParent<Building>() : null;
+
+            if (unit != null)
+            {
+                if (IsMultiSelectable(unit)) Select(unit); // own mobile unit: also command-selectable
+                else SelectedUnit = unit;                  // any other unit (enemy, immobile): inspect only
+                return;
+            }
+
+            ResourceNode node = hit != null ? hit.GetComponentInParent<ResourceNode>() : null;
+            if (node != null) { SelectedNode = node; return; }
+
+            Building building = hit != null ? hit.GetComponentInParent<Building>() : null;
+            if (building != null) SelectedBuilding = building;
         }
 
         private void HandleBoxSelect(Vector2 a, Vector2 b)
         {
             SelectedNode = null;
             SelectedBuilding = null;
+            SelectedUnit = null;
             if (!ShiftHeld()) ClearSelection();
 
             Rect rect = ScreenRect(a, b);
             foreach (Unit u in AllUnits)
             {
+                if (!IsMultiSelectable(u)) continue;
                 Vector2 sp = _cam.WorldToScreenPoint(u.transform.position);
                 if (rect.Contains(sp)) Select(u);
             }
@@ -136,6 +195,19 @@ namespace AditusBelli.Units
             }
 
             Collider2D hit = Physics2D.OverlapPoint(world);
+
+            // Right-clicking an enemy entity orders an attack.
+            Health enemy = hit != null ? hit.GetComponentInParent<Health>() : null;
+            if (enemy != null && IsEnemy(enemy))
+            {
+                foreach (Unit u in _selected)
+                {
+                    var combatant = u.GetComponent<Combatant>();
+                    if (combatant != null) combatant.AttackTarget(enemy);
+                    else u.MoveTo(enemy.transform.position);
+                }
+                return;
+            }
 
             // Right-clicking a resource node sends villagers to gather it.
             ResourceNode node = hit != null ? hit.GetComponentInParent<ResourceNode>() : null;
@@ -178,6 +250,8 @@ namespace AditusBelli.Units
 
                 var villager = _selected[i].GetComponent<Villager>();
                 if (villager != null) villager.StopTasks();
+                var combatant = _selected[i].GetComponent<Combatant>();
+                if (combatant != null) combatant.StopCombat();
                 _selected[i].MoveTo(world + offset);
             }
         }
@@ -196,10 +270,12 @@ namespace AditusBelli.Units
 
         private void ClearSelection()
         {
-            foreach (Unit u in _selected) u.SetSelected(false);
+            foreach (Unit u in _selected)
+                if (u != null) u.SetSelected(false);
             _selected.Clear();
             SelectedNode = null;
             SelectedBuilding = null;
+            SelectedUnit = null;
         }
 
         private static Rect ScreenRect(Vector2 a, Vector2 b)

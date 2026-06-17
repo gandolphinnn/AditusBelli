@@ -58,6 +58,12 @@ namespace AditusBelli.Buildings
                 PlayerPopulation.Instance.AddCap(def.populationProvided);
                 _capContributed = true;
             }
+
+            if (def.trains != null && def.trains.Length > 0 && GetComponent<UnitProducer>() == null)
+            {
+                var producer = gameObject.AddComponent<UnitProducer>();
+                producer.trainable = def.trains;
+            }
         }
 
         private void UpdateVisual()

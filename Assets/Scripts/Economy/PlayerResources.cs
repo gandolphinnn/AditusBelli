@@ -1,15 +1,20 @@
+using AditusBelli.Teams;
 using UnityEngine;
 
 namespace AditusBelli.Economy
 {
     /// <summary>
-    /// The local player's resource stockpile. Single-player singleton for now.
+    /// The local player's resource stockpile. Starting amounts come from the
+    /// linked team (or the fallback fields if no team is set).
     /// </summary>
     public class PlayerResources : MonoBehaviour
     {
         public static PlayerResources Instance { get; private set; }
 
-        [Header("Starting resources")]
+        [Tooltip("If set, starting resources come from this team's data.")]
+        public TeamDef teamDef;
+
+        [Header("Starting resources (fallback if no team set)")]
         public int startFood;
         public int startWood;
         public int startGold;
@@ -20,10 +25,21 @@ namespace AditusBelli.Economy
         private void Awake()
         {
             Instance = this;
-            _amounts[(int)ResourceType.Food] = startFood;
-            _amounts[(int)ResourceType.Wood] = startWood;
-            _amounts[(int)ResourceType.Gold] = startGold;
-            _amounts[(int)ResourceType.Stone] = startStone;
+
+            if (teamDef != null)
+            {
+                _amounts[(int)ResourceType.Food] = teamDef.startFood;
+                _amounts[(int)ResourceType.Wood] = teamDef.startWood;
+                _amounts[(int)ResourceType.Gold] = teamDef.startGold;
+                _amounts[(int)ResourceType.Stone] = teamDef.startStone;
+            }
+            else
+            {
+                _amounts[(int)ResourceType.Food] = startFood;
+                _amounts[(int)ResourceType.Wood] = startWood;
+                _amounts[(int)ResourceType.Gold] = startGold;
+                _amounts[(int)ResourceType.Stone] = startStone;
+            }
         }
 
         private void OnDestroy()

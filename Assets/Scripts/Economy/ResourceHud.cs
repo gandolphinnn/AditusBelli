@@ -1,11 +1,12 @@
+using AditusBelli.Teams;
 using AditusBelli.Units;
 using UnityEngine;
 
 namespace AditusBelli.Economy
 {
     /// <summary>
-    /// Minimal IMGUI resource + population bar. Placeholder until a proper uGUI
-    /// HUD (Phase 7).
+    /// Minimal IMGUI resource + population bar for the local player. Placeholder
+    /// until a proper uGUI HUD (Phase 7).
     /// </summary>
     public class ResourceHud : MonoBehaviour
     {
@@ -24,7 +25,10 @@ namespace AditusBelli.Economy
 
             PlayerPopulation pop = PlayerPopulation.Instance;
             if (pop != null)
-                text += $"     Pop {UnitSelectionManager.UnitCount}/{pop.Cap}";
+            {
+                TeamDef local = TeamManager.Instance != null ? TeamManager.Instance.LocalPlayer : null;
+                text += $"     Pop {UnitSelectionManager.UnitCountForTeam(local)}/{pop.Cap}";
+            }
 
             GUI.Box(new Rect(8, 8, 470, 30), GUIContent.none);
             GUI.Label(new Rect(16, 12, 470, 22), text, _style);

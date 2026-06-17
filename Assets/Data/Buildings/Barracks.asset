@@ -10,15 +10,15 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b852604a063ef6a4bb73201a3db4e93d, type: 3}
-  m_Name: TownCenter
+  m_Name: Barracks
   m_EditorClassIdentifier: Assembly-CSharp::AditusBelli.Buildings.BuildingDef
-  displayName: Town Center
+  displayName: Barracks
   footprint: {x: 2, y: 2}
-  woodCost: 0
-  buildTime: 1
+  woodCost: 175
+  buildTime: 12
   populationProvided: 0
-  isDropoff: 1
-  maxHealth: 300
+  isDropoff: 0
+  maxHealth: 500
   trains:
-  - {fileID: 11400000, guid: 6274797208a5fc547b13ea1925c5683b, type: 2}
-  sprite: {fileID: 21300000, guid: 6c71e72f204530c41978f419860f2130, type: 3}
+  - {fileID: 11400000, guid: f5ecdd9e73ea50243bed4d61d392b8c8, type: 2}
+  sprite: {fileID: 21300000, guid: 6391a36c2f48b334da9f5b7ab52fba7a, type: 3}

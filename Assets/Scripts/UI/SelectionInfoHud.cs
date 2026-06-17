@@ -1,16 +1,19 @@
+using System.Collections.Generic;
 using System.Text;
 using AditusBelli.Buildings;
+using AditusBelli.Combat;
 using AditusBelli.Economy;
+using AditusBelli.Teams;
 using AditusBelli.Units;
 using UnityEngine;
 
 namespace AditusBelli.UI
 {
     /// <summary>
-    /// Bottom-left panel describing the current selection: a building's type and
-    /// construction progress, a resource node's remaining amount, a single
-    /// villager's carried inventory, or a multi-unit summary. IMGUI placeholder
-    /// until the proper uGUI HUD (Phase 7).
+    /// Bottom-left panel describing the current selection / inspection. Any entity
+    /// (own or enemy unit, resource node, building) can be inspected with a single
+    /// click; only the player's own mobile units form a multi-unit selection.
+    /// IMGUI placeholder until the proper uGUI HUD (Phase 7).
     /// </summary>
     public class SelectionInfoHud : MonoBehaviour
     {
@@ -26,54 +29,71 @@ namespace AditusBelli.UI
 
             _style ??= new GUIStyle(GUI.skin.label) { fontSize = 13, wordWrap = true };
 
-            var rect = new Rect(8, Screen.height - 78, 420, 70);
+            var rect = new Rect(8, Screen.height - 84, 420, 76);
             GUI.Box(rect, GUIContent.none);
             GUI.Label(new Rect(rect.x + 8, rect.y + 6, rect.width - 16, rect.height - 12), text, _style);
         }
 
         private static string BuildInfo(UnitSelectionManager sm)
         {
-            Building building = sm.SelectedBuilding;
-            if (building != null)
+            IReadOnlyList<Unit> selection = sm.Selected;
+
+            if (selection.Count >= 2) return MultiInfo(selection);
+            if (selection.Count == 1) return UnitInfo(selection[0]);
+
+            if (sm.SelectedBuilding != null) return BuildingInfo(sm.SelectedBuilding);
+            if (sm.SelectedNode != null)
+                return $"{sm.SelectedNode.resourceType} source\nRemaining: {sm.SelectedNode.amount}";
+            if (sm.SelectedUnit != null) return UnitInfo(sm.SelectedUnit);
+
+            return null;
+        }
+
+        private static string UnitInfo(Unit u)
+        {
+            if (u == null) return null;
+
+            var villager = u.GetComponent<Villager>();
+            var combatant = u.GetComponent<Combatant>();
+            string name = combatant != null ? "Soldier" : (villager != null ? "Villager" : "Unit");
+
+            var info = new StringBuilder(name);
+            AppendTeam(info, u.GetComponent<Owner>());
+
+            if (villager != null)
+                info.Append(villager.CarriedAmount > 0
+                    ? $"\nCarrying: {villager.CarriedAmount}/{villager.CarryCapacity} {villager.CarriedType}"
+                    : $"\nInventory empty (capacity {villager.CarryCapacity})");
+
+            AppendHealth(info, u.GetComponent<Health>());
+            return info.ToString();
+        }
+
+        private static string BuildingInfo(Building b)
+        {
+            var info = new StringBuilder(b.Def != null ? b.Def.displayName : "Building");
+            AppendTeam(info, b.GetComponent<Owner>());
+
+            if (!b.IsComplete)
             {
-                string name = building.Def != null ? building.Def.displayName : "Building";
-
-                if (!building.IsComplete)
-                    return $"{name} (under construction)\n{Mathf.RoundToInt(building.Progress * 100f)}% complete";
-
-                var info = new StringBuilder(name);
-                if (building.Def != null)
-                {
-                    if (building.Def.isDropoff) info.Append("\nResource drop-off");
-                    if (building.Def.populationProvided > 0)
-                        info.Append($"\n+{building.Def.populationProvided} population");
-                }
-                return info.ToString();
+                info.Append($"\nUnder construction: {Mathf.RoundToInt(b.Progress * 100f)}%");
+            }
+            else if (b.Def != null)
+            {
+                if (b.Def.isDropoff) info.Append("\nResource drop-off");
+                if (b.Def.populationProvided > 0) info.Append($"\n+{b.Def.populationProvided} population");
             }
 
-            ResourceNode node = sm.SelectedNode;
-            if (node != null)
-                return $"{node.resourceType} source\nRemaining: {node.amount}";
+            AppendHealth(info, b.GetComponent<Health>());
+            return info.ToString();
+        }
 
-            var selection = sm.Selected;
-            if (selection.Count == 0) return null;
-
-            if (selection.Count == 1)
-            {
-                var villager = selection[0].GetComponent<Villager>();
-                if (villager == null) return "Unit selected";
-
-                if (villager.CarriedAmount > 0)
-                    return $"Villager\nCarrying: {villager.CarriedAmount}/" +
-                           $"{villager.CarryCapacity} {villager.CarriedType}";
-
-                return $"Villager\nInventory empty (capacity {villager.CarryCapacity})";
-            }
-
-            // Multiple units: count + aggregated carried amounts per resource type.
+        private static string MultiInfo(IReadOnlyList<Unit> selection)
+        {
             var totals = new int[4];
             foreach (Unit u in selection)
             {
+                if (u == null) continue;
                 var villager = u.GetComponent<Villager>();
                 if (villager == null || villager.CarriedAmount <= 0) continue;
                 totals[(int)villager.CarriedType] += villager.CarriedAmount;
@@ -84,6 +104,16 @@ namespace AditusBelli.UI
             string carried = CarriedSummary(totals);
             if (carried.Length > 0) sb.Append("\nCarrying: ").Append(carried);
             return sb.ToString();
+        }
+
+        private static void AppendTeam(StringBuilder sb, Owner owner)
+        {
+            if (owner != null && owner.Team != null) sb.Append($"  ({owner.Team.displayName})");
+        }
+
+        private static void AppendHealth(StringBuilder sb, Health h)
+        {
+            if (h != null) sb.Append($"\nHP {h.Current}/{h.Max}");
         }
 
         private static string CarriedSummary(int[] totals)

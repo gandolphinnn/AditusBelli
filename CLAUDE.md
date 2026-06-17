@@ -46,6 +46,9 @@ All C# lives under the `AditusBelli.*` namespace
 5. **Building tilemaps from script.** After `SetTiles`, mark the tilemap and scene dirty
    (`EditorUtility.SetDirty` + `EditorSceneManager.MarkSceneDirty`) before `SaveScene`,
    otherwise the tiles are not flushed and the saved tilemap is empty.
+6. **Selection vs inspection.** Every entity (any unit, building, resource node) is
+   single-click *inspectable* (its info shows in the HUD). Only the player's own *mobile*
+   units can be *multi-selected* (Shift+click and box-select) and commanded.
 
 ## Setup / how to run
 
