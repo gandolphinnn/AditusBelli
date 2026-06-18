@@ -134,9 +134,7 @@ namespace AditusBelli.EditorTools
             resources.teamDef = playerTeam; // starting resources come from the team
 
             systemsGo.AddComponent<PlayerPopulation>();
-            systemsGo.AddComponent<ResourceHud>();
-            systemsGo.AddComponent<SelectionInfoHud>();
-            systemsGo.AddComponent<ProductionHud>();
+            systemsGo.AddComponent<HudController>(); // builds the runtime uGUI HUD
 
             var teamManager = systemsGo.AddComponent<TeamManager>();
             teamManager.teams = new[] { playerTeam, enemyTeam };

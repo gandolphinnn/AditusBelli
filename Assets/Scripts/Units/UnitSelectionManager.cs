@@ -3,6 +3,7 @@ using AditusBelli.Buildings;
 using AditusBelli.Combat;
 using AditusBelli.Economy;
 using AditusBelli.Teams;
+using AditusBelli.UI;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -25,7 +26,7 @@ namespace AditusBelli.Units
         public Color boxFill = new Color(0.3f, 0.85f, 0.45f, 0.15f);
         public Color boxBorder = new Color(0.4f, 0.95f, 0.55f, 0.9f);
 
-        private static readonly List<Unit> AllUnits = new();
+        private static readonly List<Unit> AllUnitsList = new();
         private readonly List<Unit> _selected = new();
 
         public static UnitSelectionManager Instance { get; private set; }
@@ -33,11 +34,18 @@ namespace AditusBelli.Units
         public Building SelectedBuilding { get; private set; }
         public Unit SelectedUnit { get; private set; } // single inspected unit (any owner), not command-selected
         public IReadOnlyList<Unit> Selected => _selected;
+
+        // Drag state, read by the HUD SelectionBox to draw the box-select rectangle.
+        public bool IsDragging => _dragging;
+        public Vector2 DragStart => _dragStart;
+
+        /// <summary>All registered units (any owner). Used by the minimap and fog of war.</summary>
+        public static IReadOnlyList<Unit> AllUnits => AllUnitsList;
         public static int UnitCountForTeam(TeamDef team)
         {
-            if (team == null) return AllUnits.Count;
+            if (team == null) return AllUnitsList.Count;
             int count = 0;
-            foreach (Unit u in AllUnits)
+            foreach (Unit u in AllUnitsList)
             {
                 if (u == null) continue;
                 var owner = u.GetComponent<Owner>();
@@ -50,11 +58,11 @@ namespace AditusBelli.Units
         private Vector2 _dragStart;
         private bool _dragging;
 
-        public static void Register(Unit u) { if (!AllUnits.Contains(u)) AllUnits.Add(u); }
+        public static void Register(Unit u) { if (!AllUnitsList.Contains(u)) AllUnitsList.Add(u); }
 
         public static void Unregister(Unit u)
         {
-            AllUnits.Remove(u);
+            AllUnitsList.Remove(u);
             if (Instance != null) Instance._selected.Remove(u); // drop destroyed units from the selection
         }
 
@@ -78,7 +86,10 @@ namespace AditusBelli.Units
             if (_cam == null || mouse == null) return;
             if (BuildingPlacer.IsActive) return; // building placement consumes input
 
-            if (mouse.leftButton.wasPressedThisFrame)
+            // Clicks that start over the HUD belong to the HUD, not the world.
+            bool overUi = HudController.IsPointerOverUi;
+
+            if (mouse.leftButton.wasPressedThisFrame && !overUi)
             {
                 _dragStart = mouse.position.ReadValue();
                 _dragging = true;
@@ -94,7 +105,7 @@ namespace AditusBelli.Units
                     HandleBoxSelect(_dragStart, end);
             }
 
-            if (mouse.rightButton.wasPressedThisFrame)
+            if (mouse.rightButton.wasPressedThisFrame && !overUi)
                 HandleMoveCommand(mouse.position.ReadValue());
         }
 
@@ -171,7 +182,7 @@ namespace AditusBelli.Units
             if (!ShiftHeld()) ClearSelection();
 
             Rect rect = ScreenRect(a, b);
-            foreach (Unit u in AllUnits)
+            foreach (Unit u in AllUnitsList)
             {
                 if (!IsMultiSelectable(u)) continue;
                 Vector2 sp = _cam.WorldToScreenPoint(u.transform.position);
@@ -283,38 +294,6 @@ namespace AditusBelli.Units
             float xMin = Mathf.Min(a.x, b.x);
             float yMin = Mathf.Min(a.y, b.y);
             return new Rect(xMin, yMin, Mathf.Abs(a.x - b.x), Mathf.Abs(a.y - b.y));
-        }
-
-        private void OnGUI()
-        {
-            if (!_dragging) return;
-            var mouse = Mouse.current;
-            if (mouse == null) return;
-
-            Vector2 cur = mouse.position.ReadValue();
-            if (Vector2.Distance(_dragStart, cur) < dragThreshold) return;
-
-            Rect r = ScreenRect(_dragStart, cur);
-            // Input origin is bottom-left; GUI origin is top-left.
-            var guiRect = new Rect(r.xMin, Screen.height - r.yMax, r.width, r.height);
-            DrawBox(guiRect);
-        }
-
-        private void DrawBox(Rect r)
-        {
-            Color old = GUI.color;
-
-            GUI.color = boxFill;
-            GUI.DrawTexture(r, Texture2D.whiteTexture);
-
-            GUI.color = boxBorder;
-            const float t = 1.5f;
-            GUI.DrawTexture(new Rect(r.xMin, r.yMin, r.width, t), Texture2D.whiteTexture);
-            GUI.DrawTexture(new Rect(r.xMin, r.yMax - t, r.width, t), Texture2D.whiteTexture);
-            GUI.DrawTexture(new Rect(r.xMin, r.yMin, t, r.height), Texture2D.whiteTexture);
-            GUI.DrawTexture(new Rect(r.xMax - t, r.yMin, t, r.height), Texture2D.whiteTexture);
-
-            GUI.color = old;
         }
     }
 }

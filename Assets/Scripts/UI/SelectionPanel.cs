@@ -6,33 +6,77 @@ using AditusBelli.Economy;
 using AditusBelli.Teams;
 using AditusBelli.Units;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace AditusBelli.UI
 {
     /// <summary>
     /// Bottom-left panel describing the current selection / inspection. Any entity
-    /// (own or enemy unit, resource node, building) can be inspected with a single
-    /// click; only the player's own mobile units form a multi-unit selection.
-    /// IMGUI placeholder until the proper uGUI HUD (Phase 7).
+    /// can be inspected with a single click; only the player's own mobile units
+    /// form a multi-unit selection. Replaces the old IMGUI SelectionInfoHud.
     /// </summary>
-    public class SelectionInfoHud : MonoBehaviour
+    public class SelectionPanel : MonoBehaviour
     {
-        private GUIStyle _style;
+        private RectTransform _panel;
+        private Text _info;
+        private RectTransform _hpBack;
+        private RectTransform _hpFill;
+        private Text _hpText;
 
-        private void OnGUI()
+        private void Start()
+        {
+            RectTransform root = HudController.Instance != null ? HudController.Instance.Root : null;
+            if (root == null) { enabled = false; return; }
+
+            _panel = UiFactory.Panel(root, "SelectionPanel", UiFactory.PanelColor);
+            UiFactory.Place(_panel, new Vector2(0f, 0f), new Vector2(8f, 8f), new Vector2(320f, 96f));
+
+            _info = UiFactory.Label(_panel, "Info", 14, TextAnchor.UpperLeft);
+            UiFactory.Stretch(_info.rectTransform, 10f, 26f, 10f, 8f);
+
+            _hpBack = UiFactory.Panel(_panel, "HpBar", UiFactory.BarBackColor);
+            UiFactory.Place(_hpBack, new Vector2(0f, 0f), new Vector2(10f, 8f), new Vector2(300f, 14f));
+            _hpFill = UiFactory.Image(_hpBack, "HpFill", new Color(0.4f, 0.85f, 0.45f, 0.95f)).rectTransform;
+            UiFactory.SetBar(_hpFill, 1f);
+
+            _hpText = UiFactory.Label(_hpBack, "HpText", 11, TextAnchor.MiddleCenter);
+            UiFactory.Stretch(_hpText.rectTransform);
+
+            _panel.gameObject.SetActive(false);
+        }
+
+        private void Update()
         {
             UnitSelectionManager sm = UnitSelectionManager.Instance;
-            if (sm == null) return;
+            if (_panel == null || sm == null) return;
 
             string text = BuildInfo(sm);
-            if (string.IsNullOrEmpty(text)) return;
+            if (string.IsNullOrEmpty(text)) { _panel.gameObject.SetActive(false); return; }
 
-            _style ??= new GUIStyle(GUI.skin.label) { fontSize = 13, wordWrap = true };
+            _panel.gameObject.SetActive(true);
+            _info.text = text;
 
-            var rect = new Rect(8, Screen.height - 84, 420, 76);
-            GUI.Box(rect, GUIContent.none);
-            GUI.Label(new Rect(rect.x + 8, rect.y + 6, rect.width - 16, rect.height - 12), text, _style);
+            Health h = PrimaryHealth(sm);
+            bool showHp = h != null && h.Max > 0;
+            _hpBack.gameObject.SetActive(showHp);
+            if (showHp)
+            {
+                UiFactory.SetBar(_hpFill, h.Current / (float)h.Max);
+                _hpText.text = $"HP {h.Current}/{h.Max}";
+            }
         }
+
+        /// <summary>The Health whose bar should be shown (single entity only).</summary>
+        private static Health PrimaryHealth(UnitSelectionManager sm)
+        {
+            if (sm.Selected.Count == 1) return sm.Selected[0] != null ? sm.Selected[0].GetComponent<Health>() : null;
+            if (sm.Selected.Count >= 2) return null;
+            if (sm.SelectedBuilding != null) return sm.SelectedBuilding.GetComponent<Health>();
+            if (sm.SelectedUnit != null) return sm.SelectedUnit.GetComponent<Health>();
+            return null;
+        }
+
+        // -------- info text (ported from the former SelectionInfoHud) ----------
 
         private static string BuildInfo(UnitSelectionManager sm)
         {
@@ -43,7 +87,7 @@ namespace AditusBelli.UI
 
             if (sm.SelectedBuilding != null) return BuildingInfo(sm.SelectedBuilding);
             if (sm.SelectedNode != null)
-                return $"{sm.SelectedNode.resourceType} source\nRemaining: {sm.SelectedNode.amount}";
+                return $"<b>{sm.SelectedNode.resourceType} source</b>\nRemaining: {sm.SelectedNode.amount}";
             if (sm.SelectedUnit != null) return UnitInfo(sm.SelectedUnit);
 
             return null;
@@ -57,7 +101,7 @@ namespace AditusBelli.UI
             var combatant = u.GetComponent<Combatant>();
             string name = combatant != null ? "Soldier" : (villager != null ? "Villager" : "Unit");
 
-            var info = new StringBuilder(name);
+            var info = new StringBuilder("<b>").Append(name).Append("</b>");
             AppendTeam(info, u.GetComponent<Owner>());
 
             if (villager != null)
@@ -65,13 +109,12 @@ namespace AditusBelli.UI
                     ? $"\nCarrying: {villager.CarriedAmount}/{villager.CarryCapacity} {villager.CarriedType}"
                     : $"\nInventory empty (capacity {villager.CarryCapacity})");
 
-            AppendHealth(info, u.GetComponent<Health>());
             return info.ToString();
         }
 
         private static string BuildingInfo(Building b)
         {
-            var info = new StringBuilder(b.Def != null ? b.Def.displayName : "Building");
+            var info = new StringBuilder("<b>").Append(b.Def != null ? b.Def.displayName : "Building").Append("</b>");
             AppendTeam(info, b.GetComponent<Owner>());
 
             if (!b.IsComplete)
@@ -84,7 +127,6 @@ namespace AditusBelli.UI
                 if (b.Def.populationProvided > 0) info.Append($"\n+{b.Def.populationProvided} population");
             }
 
-            AppendHealth(info, b.GetComponent<Health>());
             return info.ToString();
         }
 
@@ -99,8 +141,7 @@ namespace AditusBelli.UI
                 totals[(int)villager.CarriedType] += villager.CarriedAmount;
             }
 
-            var sb = new StringBuilder();
-            sb.Append(selection.Count).Append(" units selected");
+            var sb = new StringBuilder("<b>").Append(selection.Count).Append(" units selected</b>");
             string carried = CarriedSummary(totals);
             if (carried.Length > 0) sb.Append("\nCarrying: ").Append(carried);
             return sb.ToString();
@@ -109,11 +150,6 @@ namespace AditusBelli.UI
         private static void AppendTeam(StringBuilder sb, Owner owner)
         {
             if (owner != null && owner.Team != null) sb.Append($"  ({owner.Team.displayName})");
-        }
-
-        private static void AppendHealth(StringBuilder sb, Health h)
-        {
-            if (h != null) sb.Append($"\nHP {h.Current}/{h.Max}");
         }
 
         private static string CarriedSummary(int[] totals)

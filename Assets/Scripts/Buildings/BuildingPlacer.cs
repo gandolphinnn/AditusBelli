@@ -2,6 +2,7 @@ using AditusBelli.Combat;
 using AditusBelli.Economy;
 using AditusBelli.Map;
 using AditusBelli.Teams;
+using AditusBelli.UI;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -94,7 +95,8 @@ namespace AditusBelli.Buildings
                 ? new Color(0.4f, 1f, 0.5f, 0.5f)
                 : new Color(1f, 0.4f, 0.4f, 0.5f);
 
-            if (mouse.leftButton.wasPressedThisFrame && valid)
+            // Ignore the click that pressed a Build button (it's over the HUD).
+            if (mouse.leftButton.wasPressedThisFrame && valid && !HudController.IsPointerOverUi)
             {
                 PlaceAt(grid, origin, _placing);
                 _placing = null;
@@ -162,23 +164,5 @@ namespace AditusBelli.Buildings
             _ghost.SetActive(false);
         }
 
-        private void OnGUI()
-        {
-            string hint;
-            if (IsActive)
-            {
-                hint = "Placing: left-click to build    -    right-click / Esc to cancel";
-            }
-            else
-            {
-                hint = string.Empty;
-                if (houseDef != null) hint += $"Press H: House ({houseDef.woodCost} Wood)";
-                if (barracksDef != null)
-                    hint += (hint.Length > 0 ? "    -    " : "") + $"Press B: Barracks ({barracksDef.woodCost} Wood)";
-            }
-
-            if (hint.Length > 0)
-                GUI.Label(new Rect(8, 44, 620, 22), hint);
-        }
     }
 }

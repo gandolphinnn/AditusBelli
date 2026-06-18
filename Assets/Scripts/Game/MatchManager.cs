@@ -17,7 +17,12 @@ namespace AditusBelli.Game
         private float _timer;
         private bool _decided;
         private bool _victory;
-        private GUIStyle _style;
+
+        /// <summary>True once the match outcome is settled (read by the HUD overlay).</summary>
+        public bool IsDecided => _decided;
+
+        /// <summary>Whether the settled outcome is a win for the local player.</summary>
+        public bool IsVictory => _victory;
 
         private void Awake()
         {
@@ -56,22 +61,6 @@ namespace AditusBelli.Game
             _decided = true;
             _victory = victory;
             Time.timeScale = 0f; // freeze the match
-        }
-
-        private void OnGUI()
-        {
-            if (!_decided) return;
-
-            _style ??= new GUIStyle(GUI.skin.label)
-            {
-                fontSize = 48,
-                fontStyle = FontStyle.Bold,
-                alignment = TextAnchor.MiddleCenter,
-            };
-            _style.normal.textColor = _victory ? new Color(0.4f, 1f, 0.5f) : new Color(1f, 0.45f, 0.4f);
-
-            GUI.Label(new Rect(0, Screen.height / 2f - 40f, Screen.width, 80f),
-                _victory ? "VICTORY" : "DEFEAT", _style);
         }
     }
 }
