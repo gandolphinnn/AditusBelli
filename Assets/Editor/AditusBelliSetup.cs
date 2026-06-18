@@ -27,6 +27,7 @@ namespace AditusBelli.EditorTools
         private const string ArtDir = "Assets/Art/Generated";
         private const string SceneDir = "Assets/Scenes";
         private const string ScenePath = "Assets/Scenes/Game.unity";
+        private const string WorldGenScenePath = "Assets/Scenes/WorldGen.unity";
         private const int MapSize = 40;
 
         [MenuItem("Aditus Belli/1. Configure Project Settings")]
@@ -167,6 +168,55 @@ namespace AditusBelli.EditorTools
 
             Debug.Log($"[AditusBelli] Scene created: {ScenePath}. " +
                       $"Tiles painted: {painted} (expected {MapSize * MapSize}). Press Play.");
+        }
+
+        [MenuItem("Aditus Belli/3. Build World Generator Scene")]
+        public static void BuildWorldGeneratorScene()
+        {
+            ConfigureProject();
+            EnsureFolder(SceneDir);
+
+            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+
+            // Orthographic camera with a wide zoom range so big maps fit on screen.
+            var camGo = new GameObject("Main Camera");
+            camGo.tag = "MainCamera";
+            var cam = camGo.AddComponent<Camera>();
+            cam.orthographic = true;
+            cam.orthographicSize = 20f;
+            cam.clearFlags = CameraClearFlags.SolidColor;
+            cam.backgroundColor = new Color(0.05f, 0.06f, 0.09f, 1f);
+            cam.transform.position = new Vector3(0f, 0f, -10f);
+            camGo.AddComponent<UniversalAdditionalCameraData>();
+            var camCtl = camGo.AddComponent<RtsCameraController>();
+            camCtl.minOrthoSize = 2f;
+            camCtl.maxOrthoSize = 300f;
+
+            var lightGo = new GameObject("Global Light 2D");
+            var light = lightGo.AddComponent<Light2D>();
+            light.lightType = Light2D.LightType.Global;
+            light.intensity = 1f;
+
+            // Isometric grid + empty ground tilemap (the generator paints it at runtime).
+            var gridGo = new GameObject("Grid");
+            var grid = gridGo.AddComponent<Grid>();
+            grid.cellLayout = GridLayout.CellLayout.Isometric;
+            grid.cellSize = new Vector3(1f, 0.5f, 1f);
+
+            var groundGo = new GameObject("Ground");
+            groundGo.transform.SetParent(gridGo.transform);
+            groundGo.AddComponent<Tilemap>();
+            groundGo.AddComponent<TilemapRenderer>().sortOrder = TilemapRenderer.SortOrder.TopRight;
+
+            gridGo.AddComponent<WorldMapGenerator>();
+
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene, WorldGenScenePath); // not registered in Build Settings
+            SceneView.FrameLastActiveSceneView();
+
+            Debug.Log($"[AditusBelli] World generator scene created: {WorldGenScenePath}. " +
+                      "Press Play to generate, then tweak the WorldMapGenerator and re-Play " +
+                      "(or right-click it > Regenerate).");
         }
 
         // ----------------------------------------------------------------- art
