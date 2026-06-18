@@ -2,12 +2,15 @@ using UnityEngine;
 
 namespace AditusBelli.Map
 {
-    /// <summary>Macro layout of the generated world (chosen before generating).</summary>
+    /// <summary>
+    /// Macro layout of the generated world (chosen before generating). Only
+    /// <see cref="Pangea"/> is implemented for now; Archipelago / Continents (and possibly
+    /// other shapes) are planned for later — add an enum value and a case in
+    /// <see cref="WorldMap"/>'s shaping switch.
+    /// </summary>
     public enum WorldType
     {
-        Islands,     // central landmass ringed by sea, deep sea at the far edges
-        Continental, // noise-driven landmasses that can run off the map edges
-        Lakes,       // mostly land with scattered lakes and mountain ranges
+        Pangea, // a single large landmass; water only where the noise dips below sea level
     }
 
     /// <summary>Inputs to <see cref="WorldMap.Generate"/> (filled from the generator component).</summary>
@@ -22,7 +25,8 @@ namespace AditusBelli.Map
         public int octaves;        // fractal detail layers
         public float persistence;  // amplitude falloff per octave
         public float lacunarity;   // frequency growth per octave
-        public float islandFalloff; // Islands only: higher = larger landmass
+        public float islandFalloff; // Pangea: radial edge falloff (higher = larger island)
+        public int beachWaterRadius; // Beach kept only within this many tiles of water (0 = off)
 
         // Ascending elevation thresholds in [0,1]; everything above hillLevel is Mountain.
         public float deepSeaLevel;
@@ -103,35 +107,63 @@ namespace AditusBelli.Map
                 float v = (raw[y * w + x] - min) * invRange;
                 float nx = w > 1 ? x / (float)(w - 1) : 0.5f;
                 float ny = h > 1 ? y / (float)(h - 1) : 0.5f;
-                v = Shape(v, nx, ny, s);
+                v = Shape(v, nx, ny, s.worldType, s.islandFalloff);
                 cells[y * w + x] = Classify(v, s);
             }
 
+            RemoveInlandBeaches(cells, w, h, s.beachWaterRadius);
             return new WorldMap(w, h, cells);
         }
 
-        /// <summary>Bends the normalized height according to the chosen world type.</summary>
-        private static float Shape(float v, float nx, float ny, WorldGenSettings s)
+        /// <summary>
+        /// Beach only belongs at the shoreline: any Beach cell with no Sea/DeepSea within
+        /// <paramref name="radius"/> tiles becomes Plain (removes inland sand bands that are
+        /// just an elevation contour rather than a coast). A radius of 0 disables this.
+        /// </summary>
+        private static void RemoveInlandBeaches(TerrainType[] cells, int w, int h, int radius)
         {
-            switch (s.worldType)
+            if (radius <= 0) return;
+            for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
             {
-                case WorldType.Islands:
+                int i = y * w + x;
+                if (cells[i] == TerrainType.Beach && !HasWaterNearby(cells, x, y, w, h, radius))
+                    cells[i] = TerrainType.Plain;
+            }
+        }
+
+        private static bool HasWaterNearby(TerrainType[] cells, int x, int y, int w, int h, int r)
+        {
+            int r2 = r * r;
+            for (int dy = -r; dy <= r; dy++)
+            for (int dx = -r; dx <= r; dx++)
+            {
+                if (dx * dx + dy * dy > r2) continue; // circular reach, not a square box
+                int nx = x + dx, ny = y + dy;
+                if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
+                TerrainType t = cells[ny * w + nx];
+                if (t == TerrainType.Sea || t == TerrainType.DeepSea) return true;
+            }
+            return false;
+        }
+
+        /// <summary>Bends the normalized height according to the chosen world type.</summary>
+        private static float Shape(float v, float nx, float ny, WorldType worldType, float islandFalloff)
+        {
+            switch (worldType)
+            {
+                // Pangea: a single landmass fully ringed by sea. A radial mask pulls the
+                // map edges down to deep sea (so the border is always ocean); higher
+                // islandFalloff keeps the mask near 1 farther out = a larger central island.
+                case WorldType.Pangea:
+                default:
                 {
-                    // Radial mask: 1 at the center, falling to 0 at the edges/corners,
-                    // so the landmass is ringed by sea and deep sea at the borders.
                     float dx = nx * 2f - 1f;
                     float dy = ny * 2f - 1f;
-                    float d = Mathf.Sqrt(dx * dx + dy * dy);
-                    float mask = 1f - Mathf.Pow(Mathf.Clamp01(d), Mathf.Max(0.1f, s.islandFalloff));
+                    float d = Mathf.Sqrt(dx * dx + dy * dy); // 0 at center, >=1 at edges/corners
+                    float mask = 1f - Mathf.Pow(Mathf.Clamp01(d), Mathf.Max(0.1f, islandFalloff));
                     return v * Mathf.Clamp01(mask);
                 }
-                case WorldType.Lakes:
-                    // Push most cells onto land; only local minima stay below sea level.
-                    return Mathf.Clamp01(v * 0.65f + 0.4f);
-                case WorldType.Continental:
-                default:
-                    // Open coast: pure noise, land can reach the map edges.
-                    return v;
             }
         }
 

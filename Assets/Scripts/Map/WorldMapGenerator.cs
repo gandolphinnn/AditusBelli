@@ -1,14 +1,24 @@
+using System.Collections.Generic;
+using AditusBelli.Economy;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
 namespace AditusBelli.Map
 {
+    /// <summary>How big the map is.</summary>
+    public enum WorldSize { Small, Medium, Large }
+
+    /// <summary>How much gatherable resource is on the map.</summary>
+    public enum ResourceAmount { Scarce, Normal, Abundant }
+
     /// <summary>
-    /// Runtime, seed-based procedural world map. Generates a <see cref="WorldMap"/>
-    /// from the Inspector parameters and paints it onto the child ground tilemap with
-    /// one colored diamond tile per terrain band. Standalone for now (not wired into
-    /// pathfinding/gameplay): use it in the World Generator preview scene. Change the
-    /// fields and press Play, or right-click the component and pick "Regenerate".
+    /// Runtime, seed-based procedural world generator. From a few high-level presets
+    /// (size, type, resources, players) plus tunable noise/threshold "recipe" knobs it
+    /// generates a <see cref="WorldMap"/>, paints it onto the child ground tilemap, and
+    /// computes a <see cref="MatchLayout"/> (one city center per player + scattered
+    /// resources). In the WorldGen preview scene it draws markers for that layout so a
+    /// preset can be tuned visually. See WORLD_GEN.md. Change fields and press Play (live
+    /// tuning), or use the context menu (Regenerate / Copy / Paste settings).
     /// </summary>
     [RequireComponent(typeof(Grid))]
     public class WorldMapGenerator : MonoBehaviour
@@ -18,33 +28,49 @@ namespace AditusBelli.Map
         [Tooltip("Pick a fresh random seed every time the map is generated.")]
         public bool randomizeSeed = false;
 
-        [Header("Size (cells)")]
-        [Min(8)] public int width = 80;
-        [Min(8)] public int height = 80;
+        [Header("Presets")]
+        public WorldSize size = WorldSize.Medium;
+        [Tooltip("Only Pangea is implemented for now (see WORLD_GEN.md).")]
+        public WorldType worldType = WorldType.Pangea;
+        public ResourceAmount resources = ResourceAmount.Normal;
+        [Tooltip("1 human (slot 0) + up to 3 AI. One city center per player.")]
+        [Range(1, 4)] public int playerCount = 2;
 
-        [Header("World")]
-        public WorldType worldType = WorldType.Islands;
-        [Tooltip("Islands only: higher = larger central landmass.")]
-        [Range(0.5f, 6f)] public float islandFalloff = 3f;
+        [Header("Pangea shape")]
+        [Tooltip("Higher = larger central landmass. The map edge is always sea.")]
+        [Range(1f, 6f)] public float islandFalloff = 3.5f;
 
-        [Header("Noise")]
-        [Min(1f)] public float noiseScale = 22f;
+        [Header("Noise recipe")]
+        [Tooltip("Feature size, calibrated to a 100-tile map; auto-scales with Size so the " +
+                 "landmass stays coherent at any size.")]
+        [Min(1f)] public float noiseScale = 30f;
         [Range(1, 8)] public int octaves = 5;
         [Range(0f, 1f)] public float persistence = 0.5f;
         [Range(1f, 4f)] public float lacunarity = 2f;
 
         [Header("Elevation thresholds (must ascend)")]
         [Range(0f, 1f)] public float deepSeaLevel = 0.30f;
-        [Range(0f, 1f)] public float seaLevel = 0.42f;
-        [Range(0f, 1f)] public float beachLevel = 0.46f;
-        [Range(0f, 1f)] public float plainLevel = 0.66f;
-        [Range(0f, 1f)] public float hillLevel = 0.84f;
+        [Range(0f, 1f)] public float seaLevel = 0.38f;
+        [Range(0f, 1f)] public float beachLevel = 0.43f;
+        [Range(0f, 1f)] public float plainLevel = 0.68f;
+        [Range(0f, 1f)] public float hillLevel = 0.85f;
+        [Tooltip("Beach is kept only within this many tiles of water; inland sand becomes " +
+                 "Plain. 0 = allow inland beaches.")]
+        [Range(0, 15)] public int beachWaterRadius = 3;
 
-        [Header("View")]
+        [Header("Preview")]
+        [Tooltip("Draw city-center / resource markers (tuning only; off for gameplay).")]
+        public bool drawLayoutMarkers = false;
         [Tooltip("Center and zoom the main camera to frame the whole map after generating.")]
         public bool fitCameraToMap = true;
 
-        // Per-band colors (index by TerrainType).
+        private const int PreviewDim = 128;     // reduced resolution while live-tuning
+        private const float SettleDelay = 0.4f;  // seconds of no change before a full-res rebuild
+        private const int Footprint = 2;         // city-center footprint
+        private const int EdgeMargin = 2;        // keep city centers off the map edge
+        private const int FairnessRadius = 12;   // guaranteed resources within this radius of a base
+
+        // Per-band terrain colors (index by TerrainType).
         private static readonly Color32[] Palette =
         {
             new Color32(18, 38, 84, 255),   // DeepSea
@@ -55,35 +81,108 @@ namespace AditusBelli.Map
             new Color32(132, 126, 120, 255),// Mountain
         };
 
+        // Placeholder per-player colors used only for preview markers.
+        private static readonly Color32[] PlayerMarkerColors =
+        {
+            new Color32(70, 150, 255, 255),  // player (slot 0)
+            new Color32(255, 70, 60, 255),   // AI
+            new Color32(70, 220, 110, 255),
+            new Color32(245, 210, 50, 255),
+        };
+
         private Grid _grid;
         private Tilemap _tilemap;
         private WorldMap _map;
+        private MatchLayout _layout;
         private Tile[] _tiles;
 
+        private bool _dirty;
+        private bool _pendingFull;
+        private float _settle;
+
+        // Preview-marker pool.
+        private Transform _markersRoot;
+        private Sprite _markerSprite;
+        private readonly List<Marker> _markers = new();
+
+        private class Marker
+        {
+            public GameObject root;
+            public SpriteRenderer front;
+            public SpriteRenderer halo;
+        }
+
         public WorldMap Map => _map;
+        public MatchLayout Layout => _layout;
         public TerrainType Get(int x, int y) => _map != null ? _map.Get(x, y) : TerrainType.DeepSea;
         public bool IsWalkable(int x, int y) => Get(x, y).IsWalkable();
 
-        private bool _dirty;
+        /// <summary>Cell rectangle covered by the map, in the centered coords it paints with.</summary>
+        public RectInt CenteredCellBounds => _map != null
+            ? new RectInt(-_map.Width / 2, -_map.Height / 2, _map.Width, _map.Height)
+            : new RectInt(0, 0, 1, 1);
 
-        private void Awake() => GenerateInternal(fitCameraToMap);
+        /// <summary>Terrain walkability at a centered cell (used by GameGrid).</summary>
+        public bool IsWalkableWorldCell(Vector2Int centeredCell)
+        {
+            if (_map == null) return true;
+            return _map.Get(centeredCell.x + _map.Width / 2, centeredCell.y + _map.Height / 2).IsWalkable();
+        }
 
-        // Live tuning while playing: changing any field in the Inspector flags a
-        // rebuild that is applied on the next frame. The flag debounces it, so dragging
-        // a slider regenerates once per frame instead of many times per change.
+        /// <summary>Generate once at full resolution if it hasn't been (for GameGrid, any Awake order).</summary>
+        public void EnsureGenerated()
+        {
+            if (_map == null) GenerateInternal(true);
+        }
+
+        private void Awake() => GenerateInternal(true);
+
+        // Live tuning while playing: a field change regenerates at reduced resolution next
+        // frame (debounced), then snaps to full resolution once changes settle.
         private void OnValidate() => _dirty = true;
 
         private void Update()
         {
-            if (_dirty) GenerateInternal(false); // keep the camera put while fine-tuning
+            if (_dirty)
+            {
+                _dirty = false;
+                GenerateInternal(false);
+                _pendingFull = true;
+                _settle = SettleDelay;
+            }
+            else if (_pendingFull)
+            {
+                _settle -= Time.deltaTime;
+                if (_settle <= 0f) { _pendingFull = false; GenerateInternal(true); }
+            }
         }
 
         [ContextMenu("Regenerate")]
-        public void Generate() => GenerateInternal(fitCameraToMap);
-
-        private void GenerateInternal(bool fitCamera)
+        public void Generate()
         {
-            _dirty = false;
+            _pendingFull = false;
+            GenerateInternal(true);
+        }
+
+        [ContextMenu("Copy Settings (JSON)")]
+        public void CopySettings()
+        {
+            GUIUtility.systemCopyBuffer = JsonUtility.ToJson(this, true);
+            Debug.Log("[WorldMapGenerator] Settings copied to clipboard.");
+        }
+
+        [ContextMenu("Paste Settings (JSON)")]
+        public void PasteSettings()
+        {
+            string json = GUIUtility.systemCopyBuffer;
+            if (string.IsNullOrEmpty(json)) { Debug.LogWarning("[WorldMapGenerator] Clipboard is empty."); return; }
+            JsonUtility.FromJsonOverwrite(json, this);
+            Generate();
+            Debug.Log("[WorldMapGenerator] Settings pasted from clipboard.");
+        }
+
+        private void GenerateInternal(bool fullRes)
+        {
             _grid = GetComponent<Grid>();
             if (_tilemap == null) _tilemap = GetComponentInChildren<Tilemap>();
             if (_tilemap == null)
@@ -94,13 +193,15 @@ namespace AditusBelli.Map
 
             if (randomizeSeed) seed = new System.Random().Next(int.MinValue, int.MaxValue);
 
-            var settings = new WorldGenSettings
+            int dim = Dimension(fullRes);
+            _map = WorldMap.Generate(new WorldGenSettings
             {
                 seed = seed,
-                width = width,
-                height = height,
+                width = dim,
+                height = dim,
                 worldType = worldType,
-                noiseScale = noiseScale,
+                // Scale features with the map so the macro shape is size-independent.
+                noiseScale = noiseScale * dim / 100f,
                 octaves = octaves,
                 persistence = persistence,
                 lacunarity = lacunarity,
@@ -110,13 +211,71 @@ namespace AditusBelli.Map
                 beachLevel = beachLevel,
                 plainLevel = plainLevel,
                 hillLevel = hillLevel,
-            };
+                beachWaterRadius = beachWaterRadius,
+            });
 
-            _map = WorldMap.Generate(settings);
+            _layout = MatchLayout.Build(_map, new MatchLayoutSettings
+            {
+                seed = seed,
+                playerCount = playerCount,
+                resourceDensityPer100 = ResourceDensity(),
+                footprint = Footprint,
+                edgeMargin = EdgeMargin,
+                fairnessRadius = FairnessRadius,
+                guaranteedPerCcByType = GuaranteedPerCc(),
+            });
+
             EnsureTiles();
             Paint();
-            if (fitCamera) FitCamera();
+
+            if (drawLayoutMarkers) DrawMarkers();
+            else ClearMarkers();
+
+            // Only re-frame on full-resolution builds, so the camera doesn't jump while
+            // live-tuning at preview resolution.
+            if (fullRes && fitCameraToMap) FitCamera();
         }
+
+        // ----------------------------------------------------------- preset → values
+
+        private int Dimension(bool fullRes)
+        {
+            int d = size switch
+            {
+                WorldSize.Small => 150,
+                WorldSize.Medium => 275,
+                WorldSize.Large => 400,
+                _ => 275,
+            };
+            return fullRes ? d : Mathf.Min(d, PreviewDim);
+        }
+
+        // Nodes per 100 buildable (Plain/Hill) tiles. Lowered across the board.
+        private float ResourceDensity() => resources switch
+        {
+            ResourceAmount.Scarce => 0.15f,
+            ResourceAmount.Normal => 0.30f,
+            ResourceAmount.Abundant => 0.60f,
+            _ => 0.30f,
+        };
+
+        private int[] GuaranteedPerCc()
+        {
+            float f = resources switch
+            {
+                ResourceAmount.Scarce => 0.5f,
+                ResourceAmount.Abundant => 1.5f,
+                _ => 1.0f,
+            };
+            var g = new int[4];
+            g[(int)ResourceType.Food] = Mathf.RoundToInt(2 * f);
+            g[(int)ResourceType.Wood] = Mathf.RoundToInt(2 * f);
+            g[(int)ResourceType.Gold] = Mathf.RoundToInt(1 * f);
+            g[(int)ResourceType.Stone] = Mathf.RoundToInt(1 * f);
+            return g;
+        }
+
+        // ------------------------------------------------------------------ painting
 
         private void Paint()
         {
@@ -139,6 +298,83 @@ namespace AditusBelli.Map
             _tilemap.SetTiles(positions, tiles);
             _tilemap.RefreshAllTiles();
         }
+
+        // ---------------------------------------------------------- preview markers
+
+        private void DrawMarkers()
+        {
+            if (_layout == null) { ClearMarkers(); return; }
+            EnsureMarkerInfra();
+
+            int needed = _layout.CityCenters.Count + _layout.Resources.Count;
+            while (_markers.Count < needed) _markers.Add(NewMarker());
+
+            int idx = 0;
+            for (int p = 0; p < _layout.CityCenters.Count; p++)
+            {
+                Color32 col = PlayerMarkerColors[p % PlayerMarkerColors.Length];
+                SetMarker(_markers[idx++], _layout.CityCenters[p], col, 2.6f, 24);
+            }
+            foreach (ResourcePlacement r in _layout.Resources)
+                SetMarker(_markers[idx++], r.cell, ResourceMarkerColor(r.type), 1.1f, 20);
+
+            for (; idx < _markers.Count; idx++) _markers[idx].root.SetActive(false);
+        }
+
+        private void ClearMarkers()
+        {
+            foreach (Marker m in _markers) if (m?.root != null) m.root.SetActive(false);
+        }
+
+        private void EnsureMarkerInfra()
+        {
+            if (_markerSprite == null) _markerSprite = MakeDiamondSprite(new Color32(255, 255, 255, 255));
+            if (_markersRoot == null)
+            {
+                var go = new GameObject("LayoutMarkers");
+                go.transform.SetParent(transform, false);
+                _markersRoot = go.transform;
+            }
+        }
+
+        private Marker NewMarker()
+        {
+            var root = new GameObject("Marker");
+            root.transform.SetParent(_markersRoot, false);
+            var front = root.AddComponent<SpriteRenderer>();
+            front.sprite = _markerSprite;
+
+            // Dark halo behind the colored front for contrast on any terrain.
+            var haloGo = new GameObject("Halo");
+            haloGo.transform.SetParent(root.transform, false);
+            haloGo.transform.localScale = new Vector3(1.5f, 1.5f, 1f);
+            var halo = haloGo.AddComponent<SpriteRenderer>();
+            halo.sprite = _markerSprite;
+            halo.color = new Color(0f, 0f, 0f, 0.85f);
+
+            return new Marker { root = root, front = front, halo = halo };
+        }
+
+        private void SetMarker(Marker m, Vector2Int centeredCell, Color32 color, float scale, int order)
+        {
+            m.root.SetActive(true);
+            m.root.transform.position = _grid.GetCellCenterWorld(new Vector3Int(centeredCell.x, centeredCell.y, 0));
+            m.root.transform.localScale = new Vector3(scale, scale, 1f);
+            m.front.color = color;
+            m.front.sortingOrder = order;
+            m.halo.sortingOrder = order - 1;
+        }
+
+        private static Color32 ResourceMarkerColor(ResourceType type) => type switch
+        {
+            ResourceType.Food => new Color32(235, 60, 60, 255),
+            ResourceType.Wood => new Color32(70, 205, 85, 255),
+            ResourceType.Gold => new Color32(250, 215, 45, 255),
+            ResourceType.Stone => new Color32(215, 215, 225, 255),
+            _ => new Color32(255, 255, 255, 255),
+        };
+
+        // ----------------------------------------------------------------- camera
 
         private void FitCamera()
         {
@@ -163,6 +399,8 @@ namespace AditusBelli.Map
             cam.orthographicSize = Mathf.Max((maxY - minY) * 0.5f, (maxX - minX) * 0.5f / aspect) * 1.1f;
         }
 
+        // ------------------------------------------------------------------ tiles
+
         private void EnsureTiles()
         {
             if (_tiles != null) return;
@@ -171,6 +409,14 @@ namespace AditusBelli.Map
         }
 
         private static Tile MakeDiamondTile(Color32 color)
+        {
+            var tile = ScriptableObject.CreateInstance<Tile>();
+            tile.sprite = MakeDiamondSprite(color);
+            tile.colliderType = Tile.ColliderType.None;
+            return tile;
+        }
+
+        private static Sprite MakeDiamondSprite(Color32 color)
         {
             const int w = 256, h = 128; // matches the game's iso cell (PPU 256 -> 1x0.5)
             var tex = new Texture2D(w, h, TextureFormat.RGBA32, false)
@@ -191,11 +437,7 @@ namespace AditusBelli.Map
             tex.SetPixels32(px);
             tex.Apply();
 
-            var sprite = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 256f);
-            var tile = ScriptableObject.CreateInstance<Tile>();
-            tile.sprite = sprite;
-            tile.colliderType = Tile.ColliderType.None;
-            return tile;
+            return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 256f);
         }
     }
 }

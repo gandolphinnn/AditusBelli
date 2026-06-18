@@ -208,7 +208,11 @@ namespace AditusBelli.EditorTools
             groundGo.AddComponent<Tilemap>();
             groundGo.AddComponent<TilemapRenderer>().sortOrder = TilemapRenderer.SortOrder.TopRight;
 
-            gridGo.AddComponent<WorldMapGenerator>();
+            var generator = gridGo.AddComponent<WorldMapGenerator>();
+            generator.size = WorldSize.Medium;
+            generator.playerCount = 2;     // placeholder players for the preview markers
+            generator.resources = ResourceAmount.Normal;
+            generator.drawLayoutMarkers = true; // visualize city-center / resource placement
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, WorldGenScenePath); // not registered in Build Settings

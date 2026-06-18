@@ -21,5 +21,12 @@ namespace AditusBelli.Map
         /// </summary>
         public static bool IsWalkable(this TerrainType t) =>
             t == TerrainType.Beach || t == TerrainType.Plain || t == TerrainType.Hill;
+
+        /// <summary>
+        /// Whether buildings, city centers and resource nodes may be placed here. Excludes
+        /// Beach (which is walkable but kept clear, so placements stay off the shoreline).
+        /// </summary>
+        public static bool IsBuildable(this TerrainType t) =>
+            t == TerrainType.Plain || t == TerrainType.Hill;
     }
 }
