@@ -40,6 +40,7 @@ namespace AditusBelli.UI
             gameObject.AddComponent<CommandPanel>();
             gameObject.AddComponent<SelectionBox>();
             gameObject.AddComponent<GameOverOverlay>();
+            gameObject.AddComponent<Minimap>();
         }
 
         private void OnDestroy()

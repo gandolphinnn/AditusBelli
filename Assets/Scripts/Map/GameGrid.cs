@@ -19,12 +19,65 @@ namespace AditusBelli.Map
 
         private Grid _grid;
         private GridModel _model;
+        private Bounds _worldBounds;
+        private bool _worldBoundsValid;
 
         private void Awake()
         {
             Instance = this;
             _grid = GetComponent<Grid>();
             BuildModel();
+        }
+
+        /// <summary>The cell rectangle covered by the grid (tilemap coordinates).</summary>
+        public RectInt CellBounds => _model != null
+            ? new RectInt(_model.OriginX, _model.OriginY, _model.Width, _model.Height)
+            : new RectInt(0, 0, 1, 1);
+
+        /// <summary>World-space AABB enclosing every cell (used to map the minimap/fog).</summary>
+        public Bounds WorldBounds
+        {
+            get
+            {
+                if (!_worldBoundsValid) { _worldBounds = ComputeWorldBounds(); _worldBoundsValid = true; }
+                return _worldBounds;
+            }
+        }
+
+        /// <summary>Maps a world position to [0,1]x[0,1] inside <see cref="WorldBounds"/>.</summary>
+        public Vector2 WorldToNormalized(Vector3 world)
+        {
+            Bounds b = WorldBounds;
+            return new Vector2(
+                Mathf.InverseLerp(b.min.x, b.max.x, world.x),
+                Mathf.InverseLerp(b.min.y, b.max.y, world.y));
+        }
+
+        /// <summary>Inverse of <see cref="WorldToNormalized"/> (for minimap click-navigation).</summary>
+        public Vector3 NormalizedToWorld(Vector2 n)
+        {
+            Bounds b = WorldBounds;
+            return new Vector3(
+                Mathf.Lerp(b.min.x, b.max.x, n.x),
+                Mathf.Lerp(b.min.y, b.max.y, n.y), 0f);
+        }
+
+        private Bounds ComputeWorldBounds()
+        {
+            RectInt cb = CellBounds;
+            Vector3 a = CellCenter(new Vector2Int(cb.xMin, cb.yMin));
+            Vector3 b = CellCenter(new Vector2Int(cb.xMax - 1, cb.yMin));
+            Vector3 c = CellCenter(new Vector2Int(cb.xMin, cb.yMax - 1));
+            Vector3 d = CellCenter(new Vector2Int(cb.xMax - 1, cb.yMax - 1));
+
+            var bounds = new Bounds();
+            bounds.SetMinMax(
+                new Vector3(Mathf.Min(Mathf.Min(a.x, b.x), Mathf.Min(c.x, d.x)),
+                            Mathf.Min(Mathf.Min(a.y, b.y), Mathf.Min(c.y, d.y)), 0f),
+                new Vector3(Mathf.Max(Mathf.Max(a.x, b.x), Mathf.Max(c.x, d.x)),
+                            Mathf.Max(Mathf.Max(a.y, b.y), Mathf.Max(c.y, d.y)), 0f));
+            bounds.Expand(new Vector3(1f, 0.5f, 0f)); // half-cell padding so edge blips aren't clipped
+            return bounds;
         }
 
         private void OnDestroy()

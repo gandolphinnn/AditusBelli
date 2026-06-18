@@ -33,6 +33,12 @@ namespace AditusBelli.CameraControl
 
         private void Awake() => _cam = GetComponent<Camera>();
 
+        /// <summary>Re-centers the camera over a world position (used by the minimap).</summary>
+        public void CenterOn(Vector3 world)
+        {
+            transform.position = new Vector3(world.x, world.y, transform.position.z);
+        }
+
         private void Update()
         {
             // Pan is middle-mouse-drag only for now; keyboard/edge panning is off.
