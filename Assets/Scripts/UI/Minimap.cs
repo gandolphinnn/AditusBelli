@@ -24,6 +24,8 @@ namespace AditusBelli.UI
         private const float RefreshInterval = 0.1f;
 
         private static readonly Color32 Terrain = new Color32(38, 64, 44, 255);
+        private static readonly Color32 ExploredTerrain = new Color32(22, 38, 26, 255);
+        private static readonly Color32 Unexplored = new Color32(8, 8, 10, 255);
         private static readonly Color32 Neutral = new Color32(150, 150, 150, 255);
         private static readonly Color32 ViewRect = new Color32(255, 255, 255, 255);
 
@@ -32,6 +34,7 @@ namespace AditusBelli.UI
         private RectTransform _rawRt;
 
         private GameGrid _grid;
+        private TeamDef _localTeam;
         private Camera _cam;
         private RtsCameraController _camController;
         private float _timer;
@@ -42,6 +45,7 @@ namespace AditusBelli.UI
             _grid = GameGrid.Instance;
             if (root == null || _grid == null) { enabled = false; return; }
 
+            _localTeam = TeamManager.Instance != null ? TeamManager.Instance.LocalPlayer : null;
             _cam = Camera.main;
             _camController = _cam != null ? _cam.GetComponent<RtsCameraController>() : null;
 
@@ -77,21 +81,62 @@ namespace AditusBelli.UI
 
         private void Redraw()
         {
-            for (int i = 0; i < _buffer.Length; i++) _buffer[i] = Terrain;
+            FogOfWar fog = FogOfWar.Instance;
+            bool useFog = fog != null && fog.IsEnabled;
+
+            FillTerrain(fog, useFog);
 
             foreach (ResourceNode node in ResourceNode.All)
-                if (node != null) Plot(node.transform.position, 1, ResourceColor(node.resourceType));
+                if (node != null && BlipVisible(fog, useFog, node.gameObject))
+                    Plot(node.transform.position, 1, ResourceColor(node.resourceType));
 
             foreach (Unit u in UnitSelectionManager.AllUnits)
-                if (u != null) Plot(u.transform.position, 1, BlipColor(u.gameObject));
+                if (u != null && BlipVisible(fog, useFog, u.gameObject))
+                    Plot(u.transform.position, 1, BlipColor(u.gameObject));
 
             foreach (Building b in Building.All)
-                if (b != null) Plot(b.transform.position, 2, BlipColor(b.gameObject));
+                if (b != null && BlipVisible(fog, useFog, b.gameObject))
+                    Plot(b.transform.position, 2, BlipColor(b.gameObject));
 
             DrawCameraRect();
 
             _tex.SetPixels32(_buffer);
             _tex.Apply(false);
+        }
+
+        private void FillTerrain(FogOfWar fog, bool useFog)
+        {
+            for (int py = 0; py < Size; py++)
+            for (int px = 0; px < Size; px++)
+            {
+                Color32 col = Terrain;
+                if (useFog)
+                {
+                    var n = new Vector2(px / (float)(Size - 1), py / (float)(Size - 1));
+                    Visibility v = fog.VisibilityAtWorld(_grid.NormalizedToWorld(n));
+                    col = v == Visibility.Visible ? Terrain
+                        : v == Visibility.Explored ? ExploredTerrain
+                        : Unexplored;
+                }
+                _buffer[py * Size + px] = col;
+            }
+        }
+
+        /// <summary>
+        /// Fog rules for a blip: local always shown; enemies only when currently in
+        /// sight; neutral terrain (resources/walls) once explored.
+        /// </summary>
+        private bool BlipVisible(FogOfWar fog, bool useFog, GameObject go)
+        {
+            if (!useFog) return true;
+
+            var owner = go.GetComponent<Owner>();
+            bool hasTeam = owner != null && owner.Team != null;
+            if (hasTeam && owner.Team == _localTeam) return true;
+
+            Visibility v = fog.VisibilityAtWorld(go.transform.position);
+            bool enemy = hasTeam && owner.Team != _localTeam;
+            return enemy ? v == Visibility.Visible : v != Visibility.Unseen;
         }
 
         /// <summary>Re-centers the camera on the world point under the minimap cursor.</summary>

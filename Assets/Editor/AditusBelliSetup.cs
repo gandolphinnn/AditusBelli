@@ -110,6 +110,7 @@ namespace AditusBelli.EditorTools
 
             // Logical grid + pathfinding bridge (auto-finds the ground tilemap child).
             gridGo.AddComponent<GameGrid>();
+            gridGo.AddComponent<FogOfWar>(); // builds its overlay tilemap at runtime
 
             // Teams (faction data is editable on these assets in the Inspector).
             TeamDef playerTeam = CreateTeamDef("Player", new Color(0.35f, 0.55f, 0.95f), 200, 300, 100, 100);
