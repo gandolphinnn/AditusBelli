@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Globalization;
 using AditusBelli.Economy;
 using UnityEngine;
 using UnityEngine.Tilemaps;
@@ -34,7 +35,12 @@ namespace AditusBelli.Map
         public WorldType worldType = WorldType.Pangea;
         public ResourceAmount resources = ResourceAmount.Normal;
         [Tooltip("1 human (slot 0) + up to 3 AI. One city center per player.")]
-        [Range(1, 4)] public int playerCount = 2;
+        [Range(2, 4)] public int playerCount = 2;
+
+        [Header("Recipe source")]
+        [Tooltip("ON (game): read the terrain recipe from code (WorldRecipes) by world type. " +
+                 "OFF (WorldGen sandbox): tune the recipe fields below, then 'Copy recipe as C#'.")]
+        public bool useRecipeFromCode = false;
 
         [Header("Pangea shape")]
         [Tooltip("Higher = larger central landmass. The map edge is always sea.")]
@@ -181,17 +187,52 @@ namespace AditusBelli.Map
             Debug.Log("[WorldMapGenerator] Settings pasted from clipboard.");
         }
 
+        /// <summary>Copies the current recipe as a ready-to-paste WorldRecipes dictionary entry.</summary>
+        [ContextMenu("Copy recipe as C#")]
+        public void CopyRecipeAsCSharp()
+        {
+            WorldRecipe r = CurrentRecipe();
+            var c = CultureInfo.InvariantCulture;
+            string s =
+                $"{{ WorldType.{worldType}, new WorldRecipe {{ " +
+                $"noiseScale = {r.noiseScale.ToString(c)}f, octaves = {r.octaves}, " +
+                $"persistence = {r.persistence.ToString(c)}f, lacunarity = {r.lacunarity.ToString(c)}f, " +
+                $"islandFalloff = {r.islandFalloff.ToString(c)}f, " +
+                $"deepSeaLevel = {r.deepSeaLevel.ToString(c)}f, seaLevel = {r.seaLevel.ToString(c)}f, " +
+                $"beachLevel = {r.beachLevel.ToString(c)}f, plainLevel = {r.plainLevel.ToString(c)}f, " +
+                $"hillLevel = {r.hillLevel.ToString(c)}f, beachWaterRadius = {r.beachWaterRadius} }} }},";
+            GUIUtility.systemCopyBuffer = s;
+            Debug.Log("[WorldMapGenerator] Recipe copied as C#:\n" + s);
+        }
+
+        private WorldRecipe CurrentRecipe() => new WorldRecipe
+        {
+            noiseScale = noiseScale,
+            octaves = octaves,
+            persistence = persistence,
+            lacunarity = lacunarity,
+            islandFalloff = islandFalloff,
+            deepSeaLevel = deepSeaLevel,
+            seaLevel = seaLevel,
+            beachLevel = beachLevel,
+            plainLevel = plainLevel,
+            hillLevel = hillLevel,
+            beachWaterRadius = beachWaterRadius,
+        };
+
         private void GenerateInternal(bool fullRes)
         {
             _grid = GetComponent<Grid>();
-            if (_tilemap == null) _tilemap = GetComponentInChildren<Tilemap>();
-            if (_tilemap == null)
-            {
-                Debug.LogError("[WorldMapGenerator] No child Tilemap found to paint.");
-                return;
-            }
+            if (_tilemap == null) _tilemap = GetComponentInChildren<Tilemap>(true);
+            if (_tilemap == null) _tilemap = CreateTerrainTilemap();
+            // The painted terrain is rebuilt every run; never serialize it into the scene
+            // (otherwise saving bakes thousands of tiles + the runtime textures, bloating it).
+            _tilemap.gameObject.hideFlags = HideFlags.DontSave;
 
             if (randomizeSeed) seed = new System.Random().Next(int.MinValue, int.MaxValue);
+
+            // Game reads the hand-tuned recipe from code; WorldGen tunes the fields below.
+            WorldRecipe r = useRecipeFromCode ? WorldRecipes.For(worldType) : CurrentRecipe();
 
             int dim = Dimension(fullRes);
             _map = WorldMap.Generate(new WorldGenSettings
@@ -201,17 +242,17 @@ namespace AditusBelli.Map
                 height = dim,
                 worldType = worldType,
                 // Scale features with the map so the macro shape is size-independent.
-                noiseScale = noiseScale * dim / 100f,
-                octaves = octaves,
-                persistence = persistence,
-                lacunarity = lacunarity,
-                islandFalloff = islandFalloff,
-                deepSeaLevel = deepSeaLevel,
-                seaLevel = seaLevel,
-                beachLevel = beachLevel,
-                plainLevel = plainLevel,
-                hillLevel = hillLevel,
-                beachWaterRadius = beachWaterRadius,
+                noiseScale = r.noiseScale * dim / 100f,
+                octaves = r.octaves,
+                persistence = r.persistence,
+                lacunarity = r.lacunarity,
+                islandFalloff = r.islandFalloff,
+                deepSeaLevel = r.deepSeaLevel,
+                seaLevel = r.seaLevel,
+                beachLevel = r.beachLevel,
+                plainLevel = r.plainLevel,
+                hillLevel = r.hillLevel,
+                beachWaterRadius = r.beachWaterRadius,
             });
 
             _layout = MatchLayout.Build(_map, new MatchLayoutSettings
@@ -277,6 +318,15 @@ namespace AditusBelli.Map
 
         // ------------------------------------------------------------------ painting
 
+        private Tilemap CreateTerrainTilemap()
+        {
+            var go = new GameObject("GeneratedTerrain") { hideFlags = HideFlags.DontSave };
+            go.transform.SetParent(transform, false);
+            var map = go.AddComponent<Tilemap>();
+            go.AddComponent<TilemapRenderer>().sortOrder = TilemapRenderer.SortOrder.TopRight;
+            return map;
+        }
+
         private void Paint()
         {
             _tilemap.ClearAllTiles();
@@ -331,7 +381,16 @@ namespace AditusBelli.Map
             if (_markerSprite == null) _markerSprite = MakeDiamondSprite(new Color32(255, 255, 255, 255));
             if (_markersRoot == null)
             {
-                var go = new GameObject("LayoutMarkers");
+                // Drop any markers baked into the scene by an older build, then make a
+                // fresh non-serialized root.
+                Transform existing = transform.Find("LayoutMarkers");
+                if (existing != null)
+                {
+                    if (Application.isPlaying) Destroy(existing.gameObject);
+                    else DestroyImmediate(existing.gameObject);
+                }
+
+                var go = new GameObject("LayoutMarkers") { hideFlags = HideFlags.DontSave };
                 go.transform.SetParent(transform, false);
                 _markersRoot = go.transform;
             }
@@ -339,13 +398,13 @@ namespace AditusBelli.Map
 
         private Marker NewMarker()
         {
-            var root = new GameObject("Marker");
+            var root = new GameObject("Marker") { hideFlags = HideFlags.DontSave };
             root.transform.SetParent(_markersRoot, false);
             var front = root.AddComponent<SpriteRenderer>();
             front.sprite = _markerSprite;
 
             // Dark halo behind the colored front for contrast on any terrain.
-            var haloGo = new GameObject("Halo");
+            var haloGo = new GameObject("Halo") { hideFlags = HideFlags.DontSave };
             haloGo.transform.SetParent(root.transform, false);
             haloGo.transform.localScale = new Vector3(1.5f, 1.5f, 1f);
             var halo = haloGo.AddComponent<SpriteRenderer>();
@@ -411,6 +470,7 @@ namespace AditusBelli.Map
         private static Tile MakeDiamondTile(Color32 color)
         {
             var tile = ScriptableObject.CreateInstance<Tile>();
+            tile.hideFlags = HideFlags.DontSave;
             tile.sprite = MakeDiamondSprite(color);
             tile.colliderType = Tile.ColliderType.None;
             return tile;
@@ -436,8 +496,11 @@ namespace AditusBelli.Map
             }
             tex.SetPixels32(px);
             tex.Apply();
+            tex.hideFlags = HideFlags.DontSave;
 
-            return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 256f);
+            var sprite = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 256f);
+            sprite.hideFlags = HideFlags.DontSave;
+            return sprite;
         }
     }
 }
