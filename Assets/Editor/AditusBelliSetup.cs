@@ -53,18 +53,9 @@ namespace AditusBelli.EditorTools
             EnsureFolder(ArtDir);
             EnsureFolder(SceneDir);
 
-            Tile grassA = CreateOrLoadDiamondTile("iso_grass_a", new Color32(96, 158, 74, 255));
-            Tile grassB = CreateOrLoadDiamondTile("iso_grass_b", new Color32(108, 170, 84, 255));
-
-            if (grassA == null || grassA.sprite == null || grassB == null || grassB.sprite == null)
-            {
-                Debug.LogError("[AditusBelli] Invalid tiles or sprites: scene not built. Run the command again.");
-                return;
-            }
-
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
-            // --- Orthographic camera ---
+            // --- Orthographic camera (wide zoom range for the larger procedural map) ---
             var camGo = new GameObject("Main Camera");
             camGo.tag = "MainCamera";
             var cam = camGo.AddComponent<Camera>();
@@ -74,59 +65,57 @@ namespace AditusBelli.EditorTools
             cam.backgroundColor = new Color(0.12f, 0.13f, 0.16f, 1f);
             cam.transform.position = new Vector3(0f, 0f, -10f);
             camGo.AddComponent<UniversalAdditionalCameraData>();
-            camGo.AddComponent<RtsCameraController>();
+            var camCtl = camGo.AddComponent<RtsCameraController>();
+            camCtl.minOrthoSize = 2f;
+            camCtl.maxOrthoSize = 40f;
 
-            // --- 2D global light (useful once we switch to "lit" materials) ---
+            // --- 2D global light ---
             var lightGo = new GameObject("Global Light 2D");
             var light = lightGo.AddComponent<Light2D>();
             light.lightType = Light2D.LightType.Global;
             light.intensity = 1f;
 
-            // --- Isometric grid + ground tilemap ---
+            // --- Isometric grid (terrain is generated procedurally at runtime) ---
             var gridGo = new GameObject("Grid");
             var grid = gridGo.AddComponent<Grid>();
             grid.cellLayout = GridLayout.CellLayout.Isometric;
             grid.cellSize = new Vector3(1f, 0.5f, 1f);
 
-            var groundGo = new GameObject("Ground");
-            groundGo.transform.SetParent(gridGo.transform);
-            var tilemap = groundGo.AddComponent<Tilemap>();
-            var renderer2D = groundGo.AddComponent<TilemapRenderer>();
-            renderer2D.sortOrder = TilemapRenderer.SortOrder.TopRight;
+            gridGo.AddComponent<GameGrid>();   // walkability derived from the generated terrain
+            gridGo.AddComponent<FogOfWar>();   // fog overlay (built at runtime)
 
-            int half = MapSize / 2;
-            var positions = new Vector3Int[MapSize * MapSize];
-            var tiles = new TileBase[MapSize * MapSize];
-            int idx = 0;
-            for (int x = 0; x < MapSize; x++)
-            for (int y = 0; y < MapSize; y++)
-            {
-                positions[idx] = new Vector3Int(x - half, y - half, 0);
-                tiles[idx] = ((x + y) % 2 == 0) ? grassA : grassB;
-                idx++;
-            }
-            tilemap.SetTiles(positions, tiles);
-            tilemap.RefreshAllTiles();
-            tilemap.CompressBounds();
-
-            // Logical grid + pathfinding bridge (auto-finds the ground tilemap child).
-            gridGo.AddComponent<GameGrid>();
-            gridGo.AddComponent<FogOfWar>(); // builds its overlay tilemap at runtime
+            // Procedural world generator: match params here, terrain recipe read from code.
+            var generator = gridGo.AddComponent<WorldMapGenerator>();
+            generator.worldType = WorldType.Pangea;
+            generator.size = WorldSize.Medium;
+            generator.resources = ResourceAmount.Abundant;
+            generator.playerCount = 2;
+			generator.seed = -1038437759; // preserved from the tuned WorldGen scene
 
             // Teams (faction data is editable on these assets in the Inspector).
             TeamDef playerTeam = CreateTeamDef("Player", new Color(0.35f, 0.55f, 0.95f), 200, 300, 100, 100);
             TeamDef enemyTeam = CreateTeamDef("Enemy", new Color(0.90f, 0.35f, 0.30f), 200, 300, 100, 100);
 
-            // Walls: neutral, indestructible obstacles forming a barrier with a gap.
-            BuildWalls(grid);
-
-            // --- Units + prefabs ---
+            // Prefabs + unit/building definitions.
             GameObject unitPrefab = BuildUnitPrefab(playerTeam);
-            SpawnUnits(unitPrefab, grid);
             GameObject soldierPrefab = BuildSoldierPrefab(playerTeam);
-
             UnitDef villagerDef = CreateVillagerDef(unitPrefab);
             UnitDef soldierDef = CreateSoldierDef(soldierPrefab);
+
+            BuildingDef townCenterDef = CreateTownCenterDef();
+            townCenterDef.trains = new[] { villagerDef };
+            EditorUtility.SetDirty(townCenterDef);
+            AssetDatabase.SaveAssets();
+
+            // Resource sprites used by the runtime match setup.
+            Sprite woodSprite = CreateOrLoadSprite("res_tree",
+                () => MakeCircleTexture(64, new Color32(46, 110, 56, 255), new Color32(24, 60, 30, 255)), ppu: 70f);
+            Sprite foodSprite = CreateOrLoadSprite("res_bush",
+                () => MakeCircleTexture(48, new Color32(196, 64, 78, 255), new Color32(110, 30, 40, 255)), ppu: 90f);
+            Sprite goldSprite = CreateOrLoadSprite("res_gold",
+                () => MakeCircleTexture(56, new Color32(230, 200, 60, 255), new Color32(120, 100, 20, 255)), ppu: 80f);
+            Sprite stoneSprite = CreateOrLoadSprite("res_stone",
+                () => MakeCircleTexture(56, new Color32(150, 150, 160, 255), new Color32(70, 70, 80, 255)), ppu: 80f);
 
             // --- Game systems ---
             var systemsGo = new GameObject("Game Systems");
@@ -148,26 +137,23 @@ namespace AditusBelli.EditorTools
             placer.houseDef = CreateHouseDef();
             placer.barracksDef = CreateBarracksDef(soldierDef);
 
-            // Economy: Town Center (drop-off + villager training) and resource nodes.
-            BuildEconomy(grid, villagerDef, playerTeam);
+            // Runtime match setup: one city center per team, scattered resources, and
+            // starting villagers, all placed on the generated land.
+            var match = systemsGo.AddComponent<MatchSetup>();
+            match.townCenterDef = townCenterDef;
+            match.villagerPrefab = unitPrefab;
+            match.villagersPerTeam = 3;
+            match.woodSprite = woodSprite;
+            match.foodSprite = foodSprite;
+            match.goldSprite = goldSprite;
+            match.stoneSprite = stoneSprite;
 
-            // A small enemy outpost to fight.
-            BuildEnemy(grid, enemyTeam, soldierPrefab);
-
-            // Force re-serialization: without marking dirty, SaveScene may write
-            // the tilemap still empty (native tile data is not flushed otherwise).
-            EditorUtility.SetDirty(tilemap);
-            EditorUtility.SetDirty(groundGo);
             EditorSceneManager.MarkSceneDirty(scene);
-
-            int painted = tilemap.GetUsedTilesCount();
-
             EditorSceneManager.SaveScene(scene, ScenePath);
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
             SceneView.FrameLastActiveSceneView();
 
-            Debug.Log($"[AditusBelli] Scene created: {ScenePath}. " +
-                      $"Tiles painted: {painted} (expected {MapSize * MapSize}). Press Play.");
+            Debug.Log($"[AditusBelli] Scene created: {ScenePath}. Terrain and match are generated at Play. Press Play.");
         }
 
         [MenuItem("Aditus Belli/3. Build World Generator Scene")]
@@ -208,11 +194,13 @@ namespace AditusBelli.EditorTools
             groundGo.AddComponent<Tilemap>();
             groundGo.AddComponent<TilemapRenderer>().sortOrder = TilemapRenderer.SortOrder.TopRight;
 
-            var generator = gridGo.AddComponent<WorldMapGenerator>();
+            var generator = gridGo.AddComponent<WorldGenTuner>();
+            generator.seed = -1038437759;   // preserved from the tuned WorldGen scene
             generator.size = WorldSize.Medium;
-            generator.playerCount = 2;     // placeholder players for the preview markers
-            generator.resources = ResourceAmount.Normal;
+            generator.resources = ResourceAmount.Medium;
+            generator.playerCount = 2;
             generator.drawLayoutMarkers = true; // visualize city-center / resource placement
+            generator.fitCameraToMap = true;
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, WorldGenScenePath); // not registered in Build Settings
@@ -385,12 +373,12 @@ namespace AditusBelli.EditorTools
         {
             Vector3Int[] cells =
             {
-                new Vector3Int(0, 0, 0),
-                new Vector3Int(2, 1, 0),
-                new Vector3Int(-2, 2, 0),
-                new Vector3Int(1, -2, 0),
-                new Vector3Int(-1, -1, 0),
-                new Vector3Int(3, -1, 0),
+                new(0, 0, 0),
+                new(2, 1, 0),
+                new(-2, 2, 0),
+                new(1, -2, 0),
+                new(-1, -1, 0),
+                new(3, -1, 0),
             };
 
             foreach (Vector3Int cell in cells)
@@ -438,8 +426,8 @@ namespace AditusBelli.EditorTools
             var forest = new GameObject("Forest");
             Vector3Int[] trees =
             {
-                new Vector3Int(-7, 1, 0), new Vector3Int(-7, 0, 0), new Vector3Int(-7, -1, 0),
-                new Vector3Int(-6, 1, 0), new Vector3Int(-6, 0, 0), new Vector3Int(-6, -1, 0),
+                new(-7, 1, 0), new(-7, 0, 0), new(-7, -1, 0),
+                new(-6, 1, 0), new(-6, 0, 0), new(-6, -1, 0),
             };
             foreach (Vector3Int c in trees)
                 CreateResourceNode(forest.transform, treeSprite, grid, c, ResourceType.Wood, 100, "Tree");
@@ -452,7 +440,7 @@ namespace AditusBelli.EditorTools
             var bushes = new GameObject("Berries");
             Vector3Int[] bushCells =
             {
-                new Vector3Int(-3, 3, 0), new Vector3Int(-2, 3, 0), new Vector3Int(-1, 3, 0),
+                new(-3, 3, 0), new(-2, 3, 0), new(-1, 3, 0),
             };
             foreach (Vector3Int c in bushCells)
                 CreateResourceNode(bushes.transform, bushSprite, grid, c, ResourceType.Food, 75, "Bush");
@@ -465,7 +453,7 @@ namespace AditusBelli.EditorTools
             var goldNodes = new GameObject("GoldMines");
             Vector3Int[] goldCells =
             {
-                new Vector3Int(-10, 3, 0), new Vector3Int(-11, 3, 0), new Vector3Int(-10, 2, 0),
+                new(-10, 3, 0), new(-11, 3, 0), new(-10, 2, 0),
             };
             foreach (Vector3Int c in goldCells)
                 CreateResourceNode(goldNodes.transform, goldSprite, grid, c, ResourceType.Gold, 150, "Gold");
@@ -478,7 +466,7 @@ namespace AditusBelli.EditorTools
             var stoneNodes = new GameObject("StoneMines");
             Vector3Int[] stoneCells =
             {
-                new Vector3Int(-10, -3, 0), new Vector3Int(-11, -3, 0), new Vector3Int(-10, -2, 0),
+                new(-10, -3, 0), new(-11, -3, 0), new(-10, -2, 0),
             };
             foreach (Vector3Int c in stoneCells)
                 CreateResourceNode(stoneNodes.transform, stoneSprite, grid, c, ResourceType.Stone, 150, "Stone");
@@ -493,7 +481,7 @@ namespace AditusBelli.EditorTools
                 completed: true, scale: 1f, parent: container.transform, team: enemyTeam);
 
             // A couple of enemy soldiers guarding it (defensive, leashed to their post).
-            Vector3Int[] guards = { new Vector3Int(11, 2, 0), new Vector3Int(11, -2, 0) };
+            Vector3Int[] guards = { new(11, 2, 0), new(11, -2, 0) };
             foreach (Vector3Int cell in guards)
             {
                 var go = (GameObject)PrefabUtility.InstantiatePrefab(soldierPrefab);

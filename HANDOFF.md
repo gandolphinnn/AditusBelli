@@ -1,5 +1,91 @@
 # Aditus Belli — Session Handoffs
 
+## Handoff — phase7-worldgen [25f782ea-4848-4c89-8b83-d9699275207b] — 2026-06-19 02:10
+
+### ✅ Done & verified (committed on `develop`, confirmed in Play by the user)
+- **Phase 7 — real uGUI HUD** (`6c91002`): runtime Canvas built by `HudController` +
+  `UiFactory` (`Assets/Scripts/UI/`). Panels: `ResourceBar`, `SelectionPanel` (+HP bar),
+  `CommandPanel` (Build/Train/Cancel buttons + Q/C/H/B hotkeys), `SelectionBox`,
+  `GameOverOverlay`. EventSystem uses `InputSystemUIInputModule` + `AssignDefaultActions()`.
+  `HudController.IsPointerOverUi` guards `UnitSelectionManager`/`BuildingPlacer`. All
+  old `OnGUI` deleted.
+- **Phase 7 — minimap** (`03db896`): `Assets/Scripts/UI/Minimap.cs`, Texture2D blips +
+  camera-viewport rect + click/drag navigate. `GameGrid` got `CellBounds`/`WorldBounds`/
+  `WorldToNormalized`/`NormalizedToWorld`; `RtsCameraController.CenterOn`.
+- **Phase 7 — fog of war** (`01c211d`): `Assets/Scripts/Map/VisibilityModel.cs` +
+  `FogOfWar.cs` (3-state, re-fogs, hides enemy renderers/colliders out of sight; F toggles).
+  Minimap is fog-aware.
+- **World generator (standalone)** (`4f29a74`, `fa79fb6`): seed-based fractal-Perlin
+  terrain; **Pangea = single landmass fully ringed by sea** (radial `islandFalloff`),
+  size-relative noise; `MatchLayout` = N city centers (spaced, on Plain/Hill, off edge) +
+  scattered resources on Plain/Hill with a per-base fairness minimum; beaches only near
+  water (circular `beachWaterRadius`); preview markers; `WorldGen.unity` tuning scene via
+  `Aditus Belli ▸ 3. Build World Generator Scene`.
+- **Git identity for this repo set** to `gandolphinnn <gandolfiluca03@gmail.com>` (LOCAL
+  only; global stays `Luca Gandolfi`). Repo now has a remote `github.com/gandolphinnn/AditusBelli`
+  (Git LFS configured). **Always commit here as gandolphinnn.**
+
+### 🚧 In progress / incomplete — UNCOMMITTED & NOT YET Play-verified
+A large batch of changes is on disk but **not committed and not yet confirmed compiling/
+working in Play** (user ran /handoff before testing). Needs: recompile (Console clean) →
+re-run **BOTH** `Aditus Belli ▸ 2. Build Starter Scene` AND `▸ 3. Build World Generator
+Scene` → Play-test both → then commit as gandolphinnn.
+- **Recipe-in-code architecture**: `Assets/Scripts/Map/Generation/WorldRecipe.cs` —
+  `struct WorldRecipe` + static `WorldRecipes` (`Dictionary<WorldType,WorldRecipe>`,
+  hardcoded). `WorldRecipes.Pangea` holds the user's tuned values.
+- **Generator split into 3** (`Assets/Scripts/Map/Generation/`): `WorldGeneratorBase`
+  (abstract, all shared engine + `seed`/`size`/`resources`/`playerCount`), `WorldMapGenerator`
+  (GAME: only Seed+Presets incl. `worldType`; recipe from `WorldRecipes`), `WorldGenTuner`
+  (WORLDGEN sandbox: every terrain param individually + `Copy recipe as C#` + markers/fit-
+  camera; defaults = tuned values).
+- **Generation scripts moved** to `Assets/Scripts/Map/Generation/` (TerrainType, WorldMap,
+  WorldMapGenerator, MatchLayout, WorldRecipe, WorldGeneratorBase, WorldGenTuner).
+  Namespace kept `AditusBelli.Map`.
+- **Game scene now procedural**: `GameGrid.BuildModel` derives walkability from the
+  generator's terrain; new `Assets/Scripts/Game/MatchSetup.cs` places per-team Town Centers
+  + scattered resources + 3 villagers/team + centers camera; `BuildStarterScene` rewritten
+  (no more flat map / walls / fixed economy / fixed spawns; Game size=Small, 2 players).
+- **DontSave bloat fix**: generator marks its runtime tilemap/markers/textures
+  `HideFlags.DontSave` so saving a scene no longer bakes them (an earlier `fa79fb6`
+  WorldGen.unity ballooned to ~759k lines).
+- **`WORLD_GEN.md` edits** (Pangea-only-for-now note, fairness, copy/paste) — uncommitted.
+- **Staged but uncommitted**: `SampleScene.unity` deletion (user deleted it on purpose —
+  include in next commit).
+
+### ⏭️ Next steps
+1. User recompiles + rebuilds BOTH scenes + Play-tests. Fix any compile/runtime issues.
+2. Commit the whole uncommitted batch **as gandolphinnn** (include SampleScene deletion).
+3. **Cleanup** (deferred to avoid risk): prune dead methods in `AditusBelliSetup`
+   (`BuildWalls/BuildEnemy/BuildEconomy/SpawnUnits/CreateBuilding/CreateResourceNode/
+   CreateWallDef/CreateEnemyCampDef/CreateOrLoadDiamondTile` + `MapSize` const) and remove
+   the one-off `Aditus Belli ▸ Move Generation Scripts To Generation Folder` menu command.
+4. Then gameplay: enemy AI / economy / attack waves (enemy is currently passive — a TC +
+   3 villagers, no army → DEFEAT won't trigger); later add world types Archipelago/Continents.
+
+### 🧠 Key context & decisions
+- **Tuning workflow**: WorldGen scene = sandbox (`WorldGenTuner`, tune live in Play); when
+  happy → right-click component ▸ **Copy recipe as C#** → paste the entry into
+  `WorldRecipes.cs`. Game reads recipes from there by `worldType`. No ScriptableObject —
+  recipes are hardcoded in C# on purpose (user's choice).
+- **C# 9.0 is the max** (Unity 6 / Mono / .NET Standard 2.1) — no file-scoped namespaces,
+  global usings, records-required, collection expressions, etc.
+- **Moving assets while Unity is open is unreliable** (it reconciles them back) — move via
+  `AssetDatabase.MoveAsset` (the Move-Generation-Scripts menu command does this). Same
+  reason: change Unity settings/scenes via editor scripts, not by editing files by hand.
+- **Generated content must be `HideFlags.DontSave`** so it never bakes into a saved scene.
+- **Pangea tuned recipe** (in `WorldRecipes.Pangea` + `WorldGenTuner` defaults): noiseScale
+  22, octaves 5, persistence 0.5, lacunarity 1.46, islandFalloff 3.5, levels
+  0.134/0.214/0.323/0.582/0.746, beachWaterRadius 11. WorldGen seed -1038437759.
+- **Build workflow**: exit Play → recompile → re-run the relevant Build menu command (the
+  scene is code-generated; Claude can't drive the editor GUI) → Play.
+- **TerrainType**: `IsWalkable` = Beach/Plain/Hill; `IsBuildable` = Plain/Hill only
+  (placements stay off the shoreline).
+- **Cross-session memory**: `C:\Users\Luca\.claude\projects\D--Personale-AditusBelli\memory\`
+  (`MEMORY.md` + `world-map-generator.md`). (An older note used the wrong path `D--\memory\`.)
+- **Conventions** (`CLAUDE.md`): code English-only (conversation is Italian); new Input
+  System only; isometric sort axis `(0,1,-0.26)`. Docs: `ROADMAP.md`, `GAME_IDEA.md`,
+  `WORLD_GEN.md`.
+
 ## Handoff — aditus-belli-phases-1-6 [4fa1a8e3-49c8-474a-a02c-91b7972b5d34] — 2026-06-18 01:27
 
 ### ✅ Done & verified

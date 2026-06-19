@@ -87,20 +87,33 @@ namespace AditusBelli.Map
 
         private void BuildModel()
         {
+            // Procedural maps: walkability comes from the generated terrain (sea/deep-sea/
+            // mountain are blocked). EnsureGenerated guards Awake order.
+            var generator = GetComponent<WorldGeneratorBase>();
+            if (generator != null)
+            {
+                generator.EnsureGenerated();
+                RectInt b = generator.CenteredCellBounds;
+                _model = new GridModel(b.xMin, b.yMin, b.width, b.height);
+                for (int y = b.yMin; y < b.yMax; y++)
+                for (int x = b.xMin; x < b.xMax; x++)
+                    _model.SetWalkable(x, y, generator.IsWalkableWorldCell(new Vector2Int(x, y)));
+                return;
+            }
+
+            // Flat prototype maps: a cell is walkable if the ground tilemap has a tile.
             if (groundTilemap == null) groundTilemap = GetComponentInChildren<Tilemap>();
             if (groundTilemap == null)
             {
-                Debug.LogError("[GameGrid] No ground tilemap found.");
+                Debug.LogError("[GameGrid] No ground tilemap or generator found.");
                 _model = new GridModel(0, 0, 1, 1);
                 return;
             }
 
-            BoundsInt b = groundTilemap.cellBounds;
-            _model = new GridModel(b.xMin, b.yMin, b.size.x, b.size.y);
-
-            // A cell is walkable if the ground tilemap has a tile there.
-            for (int y = b.yMin; y < b.yMax; y++)
-            for (int x = b.xMin; x < b.xMax; x++)
+            BoundsInt b2 = groundTilemap.cellBounds;
+            _model = new GridModel(b2.xMin, b2.yMin, b2.size.x, b2.size.y);
+            for (int y = b2.yMin; y < b2.yMax; y++)
+            for (int x = b2.xMin; x < b2.xMax; x++)
                 _model.SetWalkable(x, y, groundTilemap.HasTile(new Vector3Int(x, y, 0)));
         }
 
