@@ -17,5 +17,9 @@ namespace AditusBelli.Teams
         public int startWood = 200;
         public int startGold = 100;
         public int startStone = 100;
+
+        [Header("Population")]
+        [Tooltip("Population headroom before any buildings (houses add on top).")]
+        public int basePopulation = 8;
     }
 }

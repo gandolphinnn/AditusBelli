@@ -107,8 +107,7 @@ namespace AditusBelli.Buildings
 
         private void PlaceAt(GameGrid grid, Vector2Int origin, BuildingDef def)
         {
-            if (PlayerResources.Instance != null)
-                PlayerResources.Instance.TrySpend(ResourceType.Wood, def.woodCost);
+            TeamManager.Instance?.LocalEconomy?.TrySpend(ResourceType.Wood, def.woodCost);
 
             var go = new GameObject(def.displayName);
             Vector3 center = FootprintCenter(grid, origin, def.footprint);
@@ -135,9 +134,11 @@ namespace AditusBelli.Buildings
             building.startCompleted = false;
         }
 
-        private static bool CanAfford(BuildingDef def) =>
-            PlayerResources.Instance == null ||
-            PlayerResources.Instance.Get(ResourceType.Wood) >= def.woodCost;
+        private static bool CanAfford(BuildingDef def)
+        {
+            TeamEconomy econ = TeamManager.Instance != null ? TeamManager.Instance.LocalEconomy : null;
+            return econ == null || econ.Get(ResourceType.Wood) >= def.woodCost;
+        }
 
         private static bool FootprintFree(GameGrid grid, Vector2Int origin, Vector2Int size)
         {

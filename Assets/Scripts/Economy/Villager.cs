@@ -1,5 +1,6 @@
 using AditusBelli.Buildings;
 using AditusBelli.Map;
+using AditusBelli.Teams;
 using AditusBelli.Units;
 using UnityEngine;
 
@@ -21,6 +22,7 @@ namespace AditusBelli.Economy
         private enum State { Idle, ToResource, Gathering, ToDropoff, ToBuild, Building }
 
         private Unit _unit;
+        private Owner _owner;
         private State _state = State.Idle;
         private ResourceNode _node;
         private Building _buildTarget;
@@ -33,9 +35,13 @@ namespace AditusBelli.Economy
         public ResourceType CarriedType => _carriedType;
         public int CarryCapacity => carryCapacity;
 
+        /// <summary>True while the villager has a task (gathering, depositing or building).</summary>
+        public bool IsBusy => _state != State.Idle;
+
         private void Awake()
         {
             _unit = GetComponent<Unit>();
+            _owner = GetComponent<Owner>();
             _lastNodePosition = transform.position;
         }
 
@@ -118,7 +124,7 @@ namespace AditusBelli.Economy
 
         private void TickToDropoff()
         {
-            ResourceDropoff drop = ResourceDropoff.Nearest(transform.position);
+            ResourceDropoff drop = ResourceDropoff.Nearest(transform.position, _owner != null ? _owner.Team : null);
             if (drop == null) { _state = State.Idle; return; }
             if (_unit.IsMoving) return;
 
@@ -150,7 +156,7 @@ namespace AditusBelli.Economy
 
         private void GoDeposit()
         {
-            ResourceDropoff drop = ResourceDropoff.Nearest(transform.position);
+            ResourceDropoff drop = ResourceDropoff.Nearest(transform.position, _owner != null ? _owner.Team : null);
             if (drop == null) { _state = State.Idle; return; }
             _state = State.ToDropoff;
             _unit.MoveTo(drop.transform.position);
@@ -158,8 +164,8 @@ namespace AditusBelli.Economy
 
         private void Deposit()
         {
-            if (_carried > 0 && PlayerResources.Instance != null)
-                PlayerResources.Instance.Add(_carriedType, _carried);
+            if (_carried > 0 && _owner != null && TeamManager.Instance != null)
+                TeamManager.Instance.EconomyFor(_owner.Team)?.Add(_carriedType, _carried);
             _carried = 0;
         }
 

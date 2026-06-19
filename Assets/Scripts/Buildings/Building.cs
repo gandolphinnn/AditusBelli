@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using AditusBelli.Economy;
 using AditusBelli.Map;
+using AditusBelli.Teams;
 using UnityEngine;
 
 namespace AditusBelli.Buildings
@@ -24,6 +25,7 @@ namespace AditusBelli.Buildings
         private bool _complete;
         private bool _blocked;
         private bool _capContributed;
+        private TeamEconomy _capEconomy; // economy the population cap was added to
 
         public bool IsComplete => _complete;
         public float Progress => _progress;
@@ -59,10 +61,16 @@ namespace AditusBelli.Buildings
             if (def.isDropoff && GetComponent<ResourceDropoff>() == null)
                 gameObject.AddComponent<ResourceDropoff>();
 
-            if (!_capContributed && def.populationProvided != 0 && PlayerPopulation.Instance != null)
+            if (!_capContributed && def.populationProvided != 0)
             {
-                PlayerPopulation.Instance.AddCap(def.populationProvided);
-                _capContributed = true;
+                var owner = GetComponent<Owner>();
+                _capEconomy = (owner != null && TeamManager.Instance != null)
+                    ? TeamManager.Instance.EconomyFor(owner.Team) : null;
+                if (_capEconomy != null)
+                {
+                    _capEconomy.AddCap(def.populationProvided);
+                    _capContributed = true;
+                }
             }
 
             if (def.trains != null && def.trains.Length > 0 && GetComponent<UnitProducer>() == null)
@@ -94,8 +102,8 @@ namespace AditusBelli.Buildings
 
         private void OnDestroy()
         {
-            if (_capContributed && PlayerPopulation.Instance != null)
-                PlayerPopulation.Instance.RemoveCap(def.populationProvided);
+            if (_capContributed && _capEconomy != null)
+                _capEconomy.RemoveCap(def.populationProvided);
             if (_blocked) BlockFootprint(false);
         }
     }

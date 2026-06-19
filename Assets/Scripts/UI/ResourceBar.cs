@@ -28,21 +28,16 @@ namespace AditusBelli.UI
 
         private void Update()
         {
-            PlayerResources r = PlayerResources.Instance;
-            if (_text == null || r == null) return;
+            TeamManager tm = TeamManager.Instance;
+            TeamEconomy econ = tm != null ? tm.LocalEconomy : null;
+            if (_text == null || econ == null) return;
 
             string text =
-                Seg("#7BC86C", $"Food {r.Get(ResourceType.Food)}") + "    " +
-                Seg("#B6885A", $"Wood {r.Get(ResourceType.Wood)}") + "    " +
-                Seg("#E6C83C", $"Gold {r.Get(ResourceType.Gold)}") + "    " +
-                Seg("#B0B0BC", $"Stone {r.Get(ResourceType.Stone)}");
-
-            PlayerPopulation pop = PlayerPopulation.Instance;
-            if (pop != null)
-            {
-                TeamDef local = TeamManager.Instance != null ? TeamManager.Instance.LocalPlayer : null;
-                text += "    " + Seg("#FFFFFF", $"Pop {UnitSelectionManager.UnitCountForTeam(local)}/{pop.Cap}");
-            }
+                Seg("#7BC86C", $"Food {econ.Get(ResourceType.Food)}") + "    " +
+                Seg("#B6885A", $"Wood {econ.Get(ResourceType.Wood)}") + "    " +
+                Seg("#E6C83C", $"Gold {econ.Get(ResourceType.Gold)}") + "    " +
+                Seg("#B0B0BC", $"Stone {econ.Get(ResourceType.Stone)}") + "    " +
+                Seg("#FFFFFF", $"Pop {UnitSelectionManager.UnitCountForTeam(tm.LocalPlayer)}/{econ.Cap}");
 
             _text.text = text;
         }

@@ -38,6 +38,9 @@ namespace AditusBelli.Combat
 
         private void Start() => _home = transform.position;
 
+        /// <summary>True while locked onto a live target.</summary>
+        public bool HasTarget => _target != null && _target.IsAlive;
+
         public void AttackTarget(Health target)
         {
             if (target != null) _target = target;

@@ -48,18 +48,16 @@ namespace AditusBelli.Buildings
         {
             if (def == null || _building == null || !_building.IsComplete) return false;
 
-            PlayerPopulation pop = PlayerPopulation.Instance;
-            if (pop != null &&
-                UnitSelectionManager.UnitCountForTeam(_ownerTeam) + _queue.Count + def.populationCost > pop.Cap)
-                return false; // would exceed the population cap
-
-            PlayerResources res = PlayerResources.Instance;
-            if (res != null)
+            TeamEconomy econ = TeamManager.Instance != null ? TeamManager.Instance.EconomyFor(_ownerTeam) : null;
+            if (econ != null)
             {
-                if (res.Get(ResourceType.Food) < def.foodCost || res.Get(ResourceType.Wood) < def.woodCost)
+                if (UnitSelectionManager.UnitCountForTeam(_ownerTeam) + _queue.Count + def.populationCost > econ.Cap)
+                    return false; // would exceed the population cap
+
+                if (econ.Get(ResourceType.Food) < def.foodCost || econ.Get(ResourceType.Wood) < def.woodCost)
                     return false; // not enough resources
-                res.TrySpend(ResourceType.Food, def.foodCost);
-                res.TrySpend(ResourceType.Wood, def.woodCost);
+                econ.TrySpend(ResourceType.Food, def.foodCost);
+                econ.TrySpend(ResourceType.Wood, def.woodCost);
             }
 
             _queue.Add(def);
@@ -75,11 +73,11 @@ namespace AditusBelli.Buildings
             UnitDef def = _queue[last];
             _queue.RemoveAt(last);
 
-            PlayerResources res = PlayerResources.Instance;
-            if (res != null)
+            TeamEconomy econ = TeamManager.Instance != null ? TeamManager.Instance.EconomyFor(_ownerTeam) : null;
+            if (econ != null)
             {
-                res.Add(ResourceType.Food, def.foodCost);
-                res.Add(ResourceType.Wood, def.woodCost);
+                econ.Add(ResourceType.Food, def.foodCost);
+                econ.Add(ResourceType.Wood, def.woodCost);
             }
 
             if (_queue.Count == 0) _progress = 0f;

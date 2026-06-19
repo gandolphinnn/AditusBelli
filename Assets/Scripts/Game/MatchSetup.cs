@@ -19,6 +19,8 @@ namespace AditusBelli.Game
     {
         [Tooltip("Town Center definition (sprite, health, trains villagers).")]
         public BuildingDef townCenterDef;
+        [Tooltip("Barracks definition: enemy teams start with one and train soldiers from it.")]
+        public BuildingDef barracksDef;
         [Tooltip("Villager prefab spawned next to each city center at game start.")]
         public GameObject villagerPrefab;
         [Min(0)] public int villagersPerTeam = 3;
@@ -54,28 +56,30 @@ namespace AditusBelli.Game
             var rng = new System.Random(generator.seed ^ 0x1d2c3b4a);
 
             int count = teams != null ? Mathf.Min(layout.CityCenters.Count, teams.Length) : 0;
+            TeamDef local = teamManager != null ? teamManager.localPlayer : null;
             for (int i = 0; i < count; i++)
             {
                 Vector2Int cc = layout.CityCenters[i];
                 TeamDef team = teams[i];
-                CreateTownCenter(grid, cc, team);
+                CreateBuilding(grid, cc, townCenterDef, team);
                 SpawnVillagers(grid, cc, team, rng);
+                if (team != local) SetupEnemy(grid, cc, team); // give AI opponents a barracks + brain
             }
 
             SpawnResources(grid, layout);
             CenterCamera(grid, layout, teams, teamManager);
         }
 
-        private void CreateTownCenter(GameGrid grid, Vector2Int origin, TeamDef team)
+        private static Building CreateBuilding(GameGrid grid, Vector2Int origin, BuildingDef def, TeamDef team)
         {
-            int fx = Mathf.Max(1, townCenterDef.footprint.x);
-            int fy = Mathf.Max(1, townCenterDef.footprint.y);
+            int fx = Mathf.Max(1, def.footprint.x);
+            int fy = Mathf.Max(1, def.footprint.y);
 
-            var go = new GameObject(townCenterDef.displayName);
+            var go = new GameObject(def.displayName);
             go.transform.position = FootprintCenter(grid, origin, fx, fy);
 
             var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = townCenterDef.sprite;
+            sr.sprite = def.sprite;
             sr.sortingOrder = 2;
 
             go.AddComponent<CircleCollider2D>().radius = 0.4f * Mathf.Max(fx, fy);
@@ -85,13 +89,70 @@ namespace AditusBelli.Game
             owner.applyTeamColor = false; // buildings keep their type color
 
             // Init (not just the field) because Awake already ran on AddComponent.
-            go.AddComponent<Health>().Init(townCenterDef.maxHealth);
+            go.AddComponent<Health>().Init(def.maxHealth);
 
             var building = go.AddComponent<Building>();
-            building.def = townCenterDef;
+            building.def = def;
             building.originCell = origin;
             building.startCompleted = true;
+            return building;
         }
+
+        private void SetupEnemy(GameGrid grid, Vector2Int ccOrigin, TeamDef team)
+        {
+            if (barracksDef == null) return;
+
+            var tcSize = new Vector2Int(Mathf.Max(1, townCenterDef.footprint.x),
+                                        Mathf.Max(1, townCenterDef.footprint.y));
+            if (!TryFindBuildable(grid, ccOrigin, tcSize, barracksDef.footprint, out Vector2Int barracksOrigin))
+                return; // no room near the base; skip (the AI just won't have a barracks)
+
+            Building barracks = CreateBuilding(grid, barracksOrigin, barracksDef, team);
+
+            var aiGo = new GameObject($"EnemyAI ({team.displayName})");
+            aiGo.AddComponent<EnemyAI>().Init(team, barracks);
+        }
+
+        /// <summary>
+        /// Finds a free origin near the town center where the given footprint fits on
+        /// walkable terrain and does not overlap the town-center footprint. Searches
+        /// outward ring by ring. (Buildings have not blocked their cells yet at setup.)
+        /// </summary>
+        private static bool TryFindBuildable(GameGrid grid, Vector2Int tcOrigin, Vector2Int tcSize,
+            Vector2Int size, out Vector2Int origin)
+        {
+            int fx = Mathf.Max(1, size.x);
+            int fy = Mathf.Max(1, size.y);
+            for (int r = 2; r <= 8; r++)
+            {
+                for (int dy = -r; dy <= r; dy++)
+                for (int dx = -r; dx <= r; dx++)
+                {
+                    if (Mathf.Abs(dx) != r && Mathf.Abs(dy) != r) continue; // ring outline only
+                    var o = new Vector2Int(tcOrigin.x + dx, tcOrigin.y + dy);
+                    if (FootprintWalkable(grid, o, fx, fy) &&
+                        !Overlaps(o, fx, fy, tcOrigin, tcSize.x, tcSize.y))
+                    {
+                        origin = o;
+                        return true;
+                    }
+                }
+            }
+            origin = tcOrigin;
+            return false;
+        }
+
+        private static bool FootprintWalkable(GameGrid grid, Vector2Int origin, int fx, int fy)
+        {
+            for (int dx = 0; dx < fx; dx++)
+            for (int dy = 0; dy < fy; dy++)
+                if (!grid.IsWalkable(new Vector2Int(origin.x + dx, origin.y + dy))) return false;
+            return true;
+        }
+
+        private static bool Overlaps(Vector2Int aOrigin, int aw, int ah, Vector2Int bOrigin, int bw, int bh) =>
+            aOrigin.x < bOrigin.x + bw && aOrigin.x + aw > bOrigin.x &&
+            aOrigin.y < bOrigin.y + bh && aOrigin.y + ah > bOrigin.y;
 
         private void SpawnVillagers(GameGrid grid, Vector2Int ccOrigin, TeamDef team, System.Random rng)
         {

@@ -18,3 +18,4 @@ MonoBehaviour:
   startWood: 300
   startGold: 100
   startStone: 100
+  basePopulation: 8

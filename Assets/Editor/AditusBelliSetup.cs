@@ -92,9 +92,11 @@ namespace AditusBelli.EditorTools
             generator.playerCount = 2;
 			generator.seed = -1038437759; // preserved from the tuned WorldGen scene
 
-            // Teams (faction data is editable on these assets in the Inspector).
-            TeamDef playerTeam = CreateTeamDef("Player", new Color(0.35f, 0.55f, 0.95f), 200, 300, 100, 100);
-            TeamDef enemyTeam = CreateTeamDef("Enemy", new Color(0.90f, 0.35f, 0.30f), 200, 300, 100, 100);
+            // Teams (faction data is editable on these assets in the Inspector). The
+            // enemy gets a generous base population so its AI can field escalating
+            // waves without having to manage houses; the player builds houses normally.
+            TeamDef playerTeam = CreateTeamDef("Player", new Color(0.35f, 0.55f, 0.95f), 200, 300, 100, 100, 8);
+            TeamDef enemyTeam = CreateTeamDef("Enemy", new Color(0.90f, 0.35f, 0.30f), 200, 300, 100, 100, 40);
 
             // Prefabs + unit/building definitions.
             GameObject unitPrefab = BuildUnitPrefab(playerTeam);
@@ -106,6 +108,8 @@ namespace AditusBelli.EditorTools
             townCenterDef.trains = new[] { villagerDef };
             EditorUtility.SetDirty(townCenterDef);
             AssetDatabase.SaveAssets();
+
+            BuildingDef barracksDef = CreateBarracksDef(soldierDef);
 
             // Resource sprites used by the runtime match setup.
             Sprite woodSprite = CreateOrLoadSprite("res_tree",
@@ -120,13 +124,10 @@ namespace AditusBelli.EditorTools
             // --- Game systems ---
             var systemsGo = new GameObject("Game Systems");
             systemsGo.AddComponent<UnitSelectionManager>();
-
-            var resources = systemsGo.AddComponent<PlayerResources>();
-            resources.teamDef = playerTeam; // starting resources come from the team
-
-            systemsGo.AddComponent<PlayerPopulation>();
             systemsGo.AddComponent<HudController>(); // builds the runtime uGUI HUD
 
+            // TeamManager owns the per-team economies (resources + population),
+            // seeded from each TeamDef on first use. No standalone player economy.
             var teamManager = systemsGo.AddComponent<TeamManager>();
             teamManager.teams = new[] { playerTeam, enemyTeam };
             teamManager.localPlayer = playerTeam;
@@ -135,12 +136,13 @@ namespace AditusBelli.EditorTools
 
             var placer = systemsGo.AddComponent<BuildingPlacer>();
             placer.houseDef = CreateHouseDef();
-            placer.barracksDef = CreateBarracksDef(soldierDef);
+            placer.barracksDef = barracksDef;
 
             // Runtime match setup: one city center per team, scattered resources, and
             // starting villagers, all placed on the generated land.
             var match = systemsGo.AddComponent<MatchSetup>();
             match.townCenterDef = townCenterDef;
+            match.barracksDef = barracksDef;
             match.villagerPrefab = unitPrefab;
             match.villagersPerTeam = 3;
             match.woodSprite = woodSprite;
@@ -659,7 +661,8 @@ namespace AditusBelli.EditorTools
             return def;
         }
 
-        private static TeamDef CreateTeamDef(string name, Color color, int food, int wood, int gold, int stone)
+        private static TeamDef CreateTeamDef(string name, Color color, int food, int wood, int gold, int stone,
+            int basePopulation)
         {
             EnsureFolder("Assets/Data");
             EnsureFolder("Assets/Data/Teams");
@@ -678,6 +681,7 @@ namespace AditusBelli.EditorTools
             def.startWood = wood;
             def.startGold = gold;
             def.startStone = stone;
+            def.basePopulation = basePopulation;
             EditorUtility.SetDirty(def);
             AssetDatabase.SaveAssets();
             return def;
