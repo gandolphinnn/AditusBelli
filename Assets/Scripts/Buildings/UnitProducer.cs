@@ -10,14 +10,15 @@ namespace AditusBelli.Buildings
     /// <summary>
     /// Lets a building train units: a production queue with resource cost,
     /// population gating, timed production, spawning at a free adjacent cell, and
-    /// an optional rally point the new unit walks to.
+    /// an optional rally point the new unit walks to. Trainables are unit prefabs;
+    /// their cost/time come from the <see cref="UnitStats"/> on each prefab.
     /// </summary>
     [RequireComponent(typeof(Building))]
     public class UnitProducer : MonoBehaviour
     {
-        public UnitDef[] trainable;
+        public GameObject[] trainable;
 
-        private readonly List<UnitDef> _queue = new();
+        private readonly List<GameObject> _queue = new();
         private Building _building;
         private TeamDef _ownerTeam;
         private float _progress;
@@ -27,7 +28,7 @@ namespace AditusBelli.Buildings
         public int QueueCount => _queue.Count;
         public float Progress => _progress;
         public bool HasRally => _hasRally;
-        public UnitDef FirstTrainable => (trainable != null && trainable.Length > 0) ? trainable[0] : null;
+        public GameObject FirstTrainable => (trainable != null && trainable.Length > 0) ? trainable[0] : null;
 
         private void Awake()
         {
@@ -43,24 +44,27 @@ namespace AditusBelli.Buildings
             _hasRally = true;
         }
 
-        /// <summary>Queues a unit if complete, within the population cap and affordable.</summary>
-        public bool Enqueue(UnitDef def)
+        /// <summary>Queues a unit prefab if complete, within the population cap and affordable.</summary>
+        public bool Enqueue(GameObject prefab)
         {
-            if (def == null || _building == null || !_building.IsComplete) return false;
+            if (prefab == null || _building == null || !_building.IsComplete) return false;
+
+            UnitStats stats = prefab.GetComponent<UnitStats>();
+            if (stats == null) return false;
 
             TeamEconomy econ = TeamManager.Instance != null ? TeamManager.Instance.EconomyFor(_ownerTeam) : null;
             if (econ != null)
             {
-                if (UnitSelectionManager.UnitCountForTeam(_ownerTeam) + _queue.Count + def.populationCost > econ.Cap)
+                if (UnitSelectionManager.UnitCountForTeam(_ownerTeam) + _queue.Count + stats.populationCost > econ.Cap)
                     return false; // would exceed the population cap
 
-                if (econ.Get(ResourceType.Food) < def.foodCost || econ.Get(ResourceType.Wood) < def.woodCost)
+                if (econ.Get(ResourceType.Food) < stats.foodCost || econ.Get(ResourceType.Wood) < stats.woodCost)
                     return false; // not enough resources
-                econ.TrySpend(ResourceType.Food, def.foodCost);
-                econ.TrySpend(ResourceType.Wood, def.woodCost);
+                econ.TrySpend(ResourceType.Food, stats.foodCost);
+                econ.TrySpend(ResourceType.Wood, stats.woodCost);
             }
 
-            _queue.Add(def);
+            _queue.Add(prefab);
             return true;
         }
 
@@ -70,14 +74,15 @@ namespace AditusBelli.Buildings
             int last = _queue.Count - 1;
             if (last < 0) return;
 
-            UnitDef def = _queue[last];
+            GameObject prefab = _queue[last];
             _queue.RemoveAt(last);
 
+            UnitStats stats = prefab != null ? prefab.GetComponent<UnitStats>() : null;
             TeamEconomy econ = TeamManager.Instance != null ? TeamManager.Instance.EconomyFor(_ownerTeam) : null;
-            if (econ != null)
+            if (econ != null && stats != null)
             {
-                econ.Add(ResourceType.Food, def.foodCost);
-                econ.Add(ResourceType.Wood, def.woodCost);
+                econ.Add(ResourceType.Food, stats.foodCost);
+                econ.Add(ResourceType.Wood, stats.woodCost);
             }
 
             if (_queue.Count == 0) _progress = 0f;
@@ -87,21 +92,24 @@ namespace AditusBelli.Buildings
         {
             if (_queue.Count == 0) return;
 
-            UnitDef def = _queue[0];
-            _progress += Time.deltaTime / Mathf.Max(0.01f, def.trainTime);
+            GameObject prefab = _queue[0];
+            UnitStats stats = prefab != null ? prefab.GetComponent<UnitStats>() : null;
+            float trainTime = stats != null ? stats.trainTime : 1f;
+
+            _progress += Time.deltaTime / Mathf.Max(0.01f, trainTime);
             if (_progress < 1f) return;
 
             _progress = 0f;
             _queue.RemoveAt(0);
-            Spawn(def);
+            Spawn(prefab);
         }
 
-        private void Spawn(UnitDef def)
+        private void Spawn(GameObject prefab)
         {
-            if (def.prefab == null) return;
+            if (prefab == null) return;
 
             Vector3 spawn = ComputeSpawnPoint();
-            GameObject go = Instantiate(def.prefab, spawn, Quaternion.identity);
+            GameObject go = Instantiate(prefab, spawn, Quaternion.identity);
 
             var spawnedOwner = go.GetComponent<Owner>();
             if (spawnedOwner != null && _ownerTeam != null) spawnedOwner.team = _ownerTeam;
@@ -116,11 +124,10 @@ namespace AditusBelli.Buildings
         private Vector3 ComputeSpawnPoint()
         {
             GameGrid grid = GameGrid.Instance;
-            if (grid == null || _building == null || _building.def == null)
-                return transform.position;
+            if (grid == null || _building == null) return transform.position;
 
             Vector2Int o = _building.originCell;
-            Vector2Int s = _building.def.footprint;
+            Vector2Int s = _building.footprint;
 
             // First free cell on the ring around the footprint.
             for (int dy = -1; dy <= s.y; dy++)

@@ -1,4 +1,3 @@
-using AditusBelli.Combat;
 using AditusBelli.Economy;
 using AditusBelli.Map;
 using AditusBelli.Teams;
@@ -12,7 +11,8 @@ namespace AditusBelli.Buildings
     /// Drives building placement. Press H to start placing a house: a ghost
     /// preview snaps to the grid, green when the footprint is free and affordable,
     /// red otherwise. Left-click places a construction site (spending its cost);
-    /// right-click or Esc cancels.
+    /// right-click or Esc cancels. The buildable types are prefabs that carry their
+    /// own <see cref="Building"/> definition.
     /// Placement stays "active" until the placing mouse button is released, so the
     /// selection system (suppressed while active) never sees the click.
     /// </summary>
@@ -20,11 +20,13 @@ namespace AditusBelli.Buildings
     {
         public static bool IsActive { get; private set; }
 
-        public BuildingDef houseDef;
-        public BuildingDef barracksDef;
+        [Tooltip("House building prefab (carries its Building definition).")]
+        public GameObject houseDef;
+        [Tooltip("Barracks building prefab (carries its Building definition).")]
+        public GameObject barracksDef;
 
         private Camera _cam;
-        private BuildingDef _placing;
+        private GameObject _placing;
         private GameObject _ghost;
         private SpriteRenderer _ghostSr;
         private bool _awaitingRelease;
@@ -32,14 +34,15 @@ namespace AditusBelli.Buildings
         private void Awake() => _cam = Camera.main;
         private void OnDestroy() => IsActive = false;
 
-        public void BeginPlacement(BuildingDef def)
+        public void BeginPlacement(GameObject prefab)
         {
-            if (def == null) return;
-            _placing = def;
+            if (prefab == null) return;
+            _placing = prefab;
             _awaitingRelease = false;
             IsActive = true;
             EnsureGhost();
-            _ghostSr.sprite = def.sprite;
+            var sr = prefab.GetComponent<SpriteRenderer>();
+            _ghostSr.sprite = sr != null ? sr.sprite : null;
             _ghost.SetActive(true);
         }
 
@@ -86,9 +89,10 @@ namespace AditusBelli.Buildings
             Vector3Int c = grid.WorldToCell(world);
             var origin = new Vector2Int(c.x, c.y);
 
-            bool valid = FootprintFree(grid, origin, _placing.footprint) && CanAfford(_placing);
+            Vector2Int footprint = Footprint(_placing);
+            bool valid = FootprintFree(grid, origin, footprint) && CanAfford(_placing);
 
-            Vector3 center = FootprintCenter(grid, origin, _placing.footprint);
+            Vector3 center = FootprintCenter(grid, origin, footprint);
             center.z = 0f;
             _ghost.transform.position = center;
             _ghostSr.color = valid
@@ -105,39 +109,37 @@ namespace AditusBelli.Buildings
             }
         }
 
-        private void PlaceAt(GameGrid grid, Vector2Int origin, BuildingDef def)
+        private void PlaceAt(GameGrid grid, Vector2Int origin, GameObject prefab)
         {
-            TeamManager.Instance?.LocalEconomy?.TrySpend(ResourceType.Wood, def.woodCost);
+            var def = prefab.GetComponent<Building>();
+            TeamManager.Instance?.LocalEconomy?.TrySpend(ResourceType.Wood, def != null ? def.woodCost : 0);
 
-            var go = new GameObject(def.displayName);
-            Vector3 center = FootprintCenter(grid, origin, def.footprint);
+            Vector3 center = FootprintCenter(grid, origin, Footprint(prefab));
             center.z = 0f;
-            go.transform.position = center;
+            GameObject go = Instantiate(prefab, center, Quaternion.identity);
 
-            var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = def.sprite;
-            sr.sortingOrder = 2;
+            var owner = go.GetComponent<Owner>();
+            if (owner != null) owner.team = TeamManager.Instance != null ? TeamManager.Instance.LocalPlayer : null;
 
-            var col = go.AddComponent<CircleCollider2D>();
-            col.radius = 0.7f;
-
-            var owner = go.AddComponent<Owner>();
-            owner.team = TeamManager.Instance != null ? TeamManager.Instance.LocalPlayer : null;
-            owner.applyTeamColor = false;
-
-            var health = go.AddComponent<Health>();
-            health.Init(def.maxHealth);
-
-            var building = go.AddComponent<Building>();
-            building.def = def;
-            building.originCell = origin;
-            building.startCompleted = false;
+            var building = go.GetComponent<Building>();
+            if (building != null)
+            {
+                building.originCell = origin;
+                building.startCompleted = false; // construction site: villagers build it
+            }
         }
 
-        private static bool CanAfford(BuildingDef def)
+        private static Vector2Int Footprint(GameObject prefab)
         {
+            var b = prefab != null ? prefab.GetComponent<Building>() : null;
+            return b != null ? b.footprint : new Vector2Int(1, 1);
+        }
+
+        private static bool CanAfford(GameObject prefab)
+        {
+            var b = prefab != null ? prefab.GetComponent<Building>() : null;
             TeamEconomy econ = TeamManager.Instance != null ? TeamManager.Instance.LocalEconomy : null;
-            return econ == null || econ.Get(ResourceType.Wood) >= def.woodCost;
+            return econ == null || b == null || econ.Get(ResourceType.Wood) >= b.woodCost;
         }
 
         private static bool FootprintFree(GameGrid grid, Vector2Int origin, Vector2Int size)
@@ -164,6 +166,5 @@ namespace AditusBelli.Buildings
             _ghostSr.sortingOrder = 5;
             _ghost.SetActive(false);
         }
-
     }
 }

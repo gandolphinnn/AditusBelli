@@ -7,14 +7,27 @@ using UnityEngine;
 namespace AditusBelli.Buildings
 {
     /// <summary>
-    /// A placed building. Starts as a construction site (semi-transparent) and
-    /// becomes functional once villagers finish the work. Blocks its footprint
-    /// cells; contributes population and acts as a drop-off when complete.
+    /// A placed building. Its definition (footprint, cost, effects) lives directly
+    /// on the prefab — there is no separate BuildingDef asset. Starts as a
+    /// construction site (semi-transparent) and becomes functional once villagers
+    /// finish the work; blocks its footprint cells, contributes population to its
+    /// owner's economy and acts as a drop-off when complete.
     /// </summary>
     [RequireComponent(typeof(SpriteRenderer))]
     public class Building : MonoBehaviour
     {
-        public BuildingDef def;
+        [Header("Definition")]
+        public string displayName = "Building";
+        public Vector2Int footprint = new Vector2Int(2, 2);
+        public int woodCost = 50;
+        [Tooltip("Total villager-seconds of work needed to finish construction.")]
+        public float buildTime = 8f;
+        public int populationProvided = 0;
+        public bool isDropoff = false;
+        [Tooltip("Unit prefabs this building can train (each needs a UnitStats).")]
+        public GameObject[] trains;
+
+        [Header("Runtime placement")]
         public Vector2Int originCell;
         public bool startCompleted;
 
@@ -29,7 +42,6 @@ namespace AditusBelli.Buildings
 
         public bool IsComplete => _complete;
         public float Progress => _progress;
-        public BuildingDef Def => def;
 
         private void Awake() => _sr = GetComponent<SpriteRenderer>();
 
@@ -46,8 +58,8 @@ namespace AditusBelli.Buildings
         /// <summary>Adds construction work (in villager-seconds).</summary>
         public void AddWork(float seconds)
         {
-            if (_complete || def == null) return;
-            _progress = Mathf.Clamp01(_progress + seconds / Mathf.Max(0.01f, def.buildTime));
+            if (_complete) return;
+            _progress = Mathf.Clamp01(_progress + seconds / Mathf.Max(0.01f, buildTime));
             if (_progress >= 1f) CompleteInternal();
             else UpdateVisual();
         }
@@ -58,25 +70,25 @@ namespace AditusBelli.Buildings
             _progress = 1f;
             UpdateVisual();
 
-            if (def.isDropoff && GetComponent<ResourceDropoff>() == null)
+            if (isDropoff && GetComponent<ResourceDropoff>() == null)
                 gameObject.AddComponent<ResourceDropoff>();
 
-            if (!_capContributed && def.populationProvided != 0)
+            if (!_capContributed && populationProvided != 0)
             {
                 var owner = GetComponent<Owner>();
                 _capEconomy = (owner != null && TeamManager.Instance != null)
                     ? TeamManager.Instance.EconomyFor(owner.Team) : null;
                 if (_capEconomy != null)
                 {
-                    _capEconomy.AddCap(def.populationProvided);
+                    _capEconomy.AddCap(populationProvided);
                     _capContributed = true;
                 }
             }
 
-            if (def.trains != null && def.trains.Length > 0 && GetComponent<UnitProducer>() == null)
+            if (trains != null && trains.Length > 0 && GetComponent<UnitProducer>() == null)
             {
                 var producer = gameObject.AddComponent<UnitProducer>();
-                producer.trainable = def.trains;
+                producer.trainable = trains;
             }
         }
 
@@ -91,10 +103,10 @@ namespace AditusBelli.Buildings
         private void BlockFootprint(bool blocked)
         {
             GameGrid grid = GameGrid.Instance;
-            if (grid == null || def == null) return;
+            if (grid == null) return;
 
-            for (int dx = 0; dx < Mathf.Max(1, def.footprint.x); dx++)
-            for (int dy = 0; dy < Mathf.Max(1, def.footprint.y); dy++)
+            for (int dx = 0; dx < Mathf.Max(1, footprint.x); dx++)
+            for (int dy = 0; dy < Mathf.Max(1, footprint.y); dy++)
                 grid.SetWalkable(new Vector2Int(originCell.x + dx, originCell.y + dy), !blocked);
 
             _blocked = blocked;
@@ -103,7 +115,7 @@ namespace AditusBelli.Buildings
         private void OnDestroy()
         {
             if (_capContributed && _capEconomy != null)
-                _capEconomy.RemoveCap(def.populationProvided);
+                _capEconomy.RemoveCap(populationProvided);
             if (_blocked) BlockFootprint(false);
         }
     }

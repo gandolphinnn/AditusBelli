@@ -114,17 +114,17 @@ namespace AditusBelli.UI
 
         private static string BuildingInfo(Building b)
         {
-            var info = new StringBuilder("<b>").Append(b.Def != null ? b.Def.displayName : "Building").Append("</b>");
+            var info = new StringBuilder("<b>").Append(b.displayName).Append("</b>");
             AppendTeam(info, b.GetComponent<Owner>());
 
             if (!b.IsComplete)
             {
                 info.Append($"\nUnder construction: {Mathf.RoundToInt(b.Progress * 100f)}%");
             }
-            else if (b.Def != null)
+            else
             {
-                if (b.Def.isDropoff) info.Append("\nResource drop-off");
-                if (b.Def.populationProvided > 0) info.Append($"\n+{b.Def.populationProvided} population");
+                if (b.isDropoff) info.Append("\nResource drop-off");
+                if (b.populationProvided > 0) info.Append($"\n+{b.populationProvided} population");
             }
 
             return info.ToString();

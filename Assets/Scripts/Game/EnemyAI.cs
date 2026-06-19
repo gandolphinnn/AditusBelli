@@ -117,7 +117,7 @@ namespace AditusBelli.Game
             if (_producer == null && _barracks != null) _producer = _barracks.GetComponent<UnitProducer>();
             if (_producer == null) return; // barracks destroyed or not complete yet
 
-            UnitDef soldier = _producer.FirstTrainable;
+            GameObject soldier = _producer.FirstTrainable;
             if (soldier == null) return;
 
             // Keep the queue topped up toward the next wave. Enqueue gates on the enemy

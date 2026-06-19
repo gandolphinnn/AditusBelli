@@ -21,6 +21,8 @@ namespace AditusBelli.EditorTools
     /// Project setup utilities, runnable from the "Aditus Belli" menu.
     /// They configure Unity settings and build a starter scene from inside the
     /// editor (no hand-editing of ProjectSettings files while the editor runs).
+    /// Units and buildings are prefabs that carry their own data (UnitStats /
+    /// Building) — there are no ScriptableObject definitions.
     /// </summary>
     public static class AditusBelliSetup
     {
@@ -28,7 +30,6 @@ namespace AditusBelli.EditorTools
         private const string SceneDir = "Assets/Scenes";
         private const string ScenePath = "Assets/Scenes/Game.unity";
         private const string WorldGenScenePath = "Assets/Scenes/WorldGen.unity";
-        private const int MapSize = 40;
 
         [MenuItem("Aditus Belli/1. Configure Project Settings")]
         public static void ConfigureProject()
@@ -90,7 +91,7 @@ namespace AditusBelli.EditorTools
             generator.size = WorldSize.Medium;
             generator.resources = ResourceAmount.Abundant;
             generator.playerCount = 2;
-			generator.seed = -1038437759; // preserved from the tuned WorldGen scene
+            generator.seed = -1038437759; // preserved from the tuned WorldGen scene
 
             // Teams (faction data is editable on these assets in the Inspector). The
             // enemy gets a generous base population so its AI can field escalating
@@ -98,18 +99,27 @@ namespace AditusBelli.EditorTools
             TeamDef playerTeam = CreateTeamDef("Player", new Color(0.35f, 0.55f, 0.95f), 200, 300, 100, 100, 8);
             TeamDef enemyTeam = CreateTeamDef("Enemy", new Color(0.90f, 0.35f, 0.30f), 200, 300, 100, 100, 40);
 
-            // Prefabs + unit/building definitions.
-            GameObject unitPrefab = BuildUnitPrefab(playerTeam);
+            // Unit prefabs (production stats live on a UnitStats component on the prefab).
+            GameObject villagerPrefab = BuildUnitPrefab(playerTeam);
             GameObject soldierPrefab = BuildSoldierPrefab(playerTeam);
-            UnitDef villagerDef = CreateVillagerDef(unitPrefab);
-            UnitDef soldierDef = CreateSoldierDef(soldierPrefab);
 
-            BuildingDef townCenterDef = CreateTownCenterDef();
-            townCenterDef.trains = new[] { villagerDef };
-            EditorUtility.SetDirty(townCenterDef);
-            AssetDatabase.SaveAssets();
+            // Building prefabs (their definition lives on the Building component).
+            Sprite tcSprite = CreateOrLoadSprite("building_town_center",
+                () => MakeDiamondTexture(512, 256, new Color32(200, 170, 120, 255)), ppu: 256f);
+            Sprite houseSprite = CreateOrLoadSprite("building_house",
+                () => MakeDiamondTexture(512, 256, new Color32(150, 96, 70, 255)), ppu: 256f);
+            Sprite barracksSprite = CreateOrLoadSprite("building_barracks",
+                () => MakeDiamondTexture(512, 256, new Color32(120, 125, 135, 255)), ppu: 256f);
 
-            BuildingDef barracksDef = CreateBarracksDef(soldierDef);
+            GameObject townCenterPrefab = BuildBuildingPrefab("TownCenter", "Town Center", tcSprite,
+                new Vector2Int(2, 2), woodCost: 0, buildTime: 1f, population: 0, dropoff: true,
+                maxHealth: 300, trains: new[] { villagerPrefab });
+            GameObject housePrefab = BuildBuildingPrefab("House", "House", houseSprite,
+                new Vector2Int(2, 2), woodCost: 50, buildTime: 8f, population: 5, dropoff: false,
+                maxHealth: 200, trains: null);
+            GameObject barracksPrefab = BuildBuildingPrefab("Barracks", "Barracks", barracksSprite,
+                new Vector2Int(2, 2), woodCost: 175, buildTime: 12f, population: 0, dropoff: false,
+                maxHealth: 500, trains: new[] { soldierPrefab });
 
             // Resource sprites used by the runtime match setup.
             Sprite woodSprite = CreateOrLoadSprite("res_tree",
@@ -135,15 +145,15 @@ namespace AditusBelli.EditorTools
             systemsGo.AddComponent<MatchManager>();
 
             var placer = systemsGo.AddComponent<BuildingPlacer>();
-            placer.houseDef = CreateHouseDef();
-            placer.barracksDef = barracksDef;
+            placer.houseDef = housePrefab;
+            placer.barracksDef = barracksPrefab;
 
             // Runtime match setup: one city center per team, scattered resources, and
             // starting villagers, all placed on the generated land.
             var match = systemsGo.AddComponent<MatchSetup>();
-            match.townCenterDef = townCenterDef;
-            match.barracksDef = barracksDef;
-            match.villagerPrefab = unitPrefab;
+            match.townCenterDef = townCenterPrefab;
+            match.barracksDef = barracksPrefab;
+            match.villagerPrefab = villagerPrefab;
             match.villagersPerTeam = 3;
             match.woodSprite = woodSprite;
             match.foodSprite = foodSprite;
@@ -215,52 +225,6 @@ namespace AditusBelli.EditorTools
 
         // ----------------------------------------------------------------- art
 
-        private static Tile CreateOrLoadDiamondTile(string name, Color32 color)
-        {
-            string spritePath = $"{ArtDir}/{name}.png";
-            string tilePath = $"{ArtDir}/{name}.asset";
-
-            if (!File.Exists(spritePath))
-            {
-                Texture2D tex = MakeDiamondTexture(256, 128, color);
-                File.WriteAllBytes(spritePath, tex.EncodeToPNG());
-                Object.DestroyImmediate(tex);
-                AssetDatabase.ImportAsset(spritePath, ImportAssetOptions.ForceSynchronousImport);
-            }
-
-            // PPU 256 on a 256x128 texture => 1.0 x 0.5 unit tile, matching the isometric cell.
-            var importer = (TextureImporter)AssetImporter.GetAtPath(spritePath);
-            importer.textureType = TextureImporterType.Sprite;
-            importer.spriteImportMode = SpriteImportMode.Single;
-            importer.spritePixelsPerUnit = 256f;
-            importer.filterMode = FilterMode.Point;
-            importer.textureCompression = TextureImporterCompression.Uncompressed;
-
-            var settings = new TextureImporterSettings();
-            importer.ReadTextureSettings(settings);
-            settings.spriteAlignment = (int)SpriteAlignment.Center;
-            settings.spritePixelsPerUnit = 256f;
-            importer.SetTextureSettings(settings);
-            importer.SaveAndReimport();
-
-            var sprite = AssetDatabase.LoadAssetAtPath<Sprite>(spritePath);
-
-            var tile = AssetDatabase.LoadAssetAtPath<Tile>(tilePath);
-            if (tile == null)
-            {
-                tile = ScriptableObject.CreateInstance<Tile>();
-                tile.sprite = sprite;
-                AssetDatabase.CreateAsset(tile, tilePath);
-            }
-            else
-            {
-                tile.sprite = sprite;
-                EditorUtility.SetDirty(tile);
-            }
-            AssetDatabase.SaveAssets();
-            return tile;
-        }
-
         private static Texture2D MakeDiamondTexture(int w, int h, Color32 color)
         {
             var tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
@@ -286,8 +250,8 @@ namespace AditusBelli.EditorTools
 
         private static GameObject BuildUnitPrefab(TeamDef team)
         {
-            EnsureFolder("Assets/Prefabs");
-            const string prefabPath = "Assets/Prefabs/Unit.prefab";
+            EnsureFolder("Assets/Prefabs/Units");
+            const string prefabPath = "Assets/Prefabs/Units/Unit.prefab";
 
             // White body so the team color tint defines the unit's color.
             Sprite body = CreateOrLoadSprite(
@@ -314,6 +278,13 @@ namespace AditusBelli.EditorTools
             var health = go.AddComponent<Health>();
             health.maxHealth = 25;
 
+            var stats = go.AddComponent<UnitStats>();
+            stats.displayName = "Villager";
+            stats.foodCost = 50;
+            stats.woodCost = 0;
+            stats.trainTime = 6f;
+            stats.populationCost = 1;
+
             unit.selectionIndicator = AddSelectionRing(go, ring);
 
             GameObject prefab = PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
@@ -323,8 +294,8 @@ namespace AditusBelli.EditorTools
 
         private static GameObject BuildSoldierPrefab(TeamDef team)
         {
-            EnsureFolder("Assets/Prefabs");
-            const string prefabPath = "Assets/Prefabs/Soldier.prefab";
+            EnsureFolder("Assets/Prefabs/Units");
+            const string prefabPath = "Assets/Prefabs/Units/Soldier.prefab";
 
             // White square so the team color tint defines the soldier's color.
             Sprite body = CreateOrLoadSprite(
@@ -352,6 +323,13 @@ namespace AditusBelli.EditorTools
 
             go.AddComponent<Combatant>();
 
+            var stats = go.AddComponent<UnitStats>();
+            stats.displayName = "Soldier";
+            stats.foodCost = 60;
+            stats.woodCost = 0;
+            stats.trainTime = 8f;
+            stats.populationCost = 1;
+
             unit.selectionIndicator = AddSelectionRing(go, ring);
 
             GameObject prefab = PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
@@ -371,295 +349,44 @@ namespace AditusBelli.EditorTools
             return ringSr;
         }
 
-        private static void SpawnUnits(GameObject prefab, Grid grid)
-        {
-            Vector3Int[] cells =
-            {
-                new(0, 0, 0),
-                new(2, 1, 0),
-                new(-2, 2, 0),
-                new(1, -2, 0),
-                new(-1, -1, 0),
-                new(3, -1, 0),
-            };
-
-            foreach (Vector3Int cell in cells)
-            {
-                var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
-                Vector3 p = grid.GetCellCenterWorld(cell);
-                p.z = 0f;
-                go.transform.position = p;
-            }
-        }
-
         // ----------------------------------------------------------- buildings
 
-        private static void BuildWalls(Grid grid)
+        private static GameObject BuildBuildingPrefab(string assetName, string displayName, Sprite sprite,
+            Vector2Int footprint, int woodCost, float buildTime, int population, bool dropoff, int maxHealth,
+            GameObject[] trains)
         {
-            BuildingDef wallDef = CreateWallDef();
-            var container = new GameObject("Walls");
+            EnsureFolder("Assets/Prefabs/Buildings");
+            string prefabPath = $"Assets/Prefabs/Buildings/{assetName}.prefab";
 
-            // A long wall at x = 5 with a 2-cell gap up at y = 3..4 (off the direct
-            // base-to-enemy line), so a correct route must visibly detour around it.
-            for (int y = -5; y <= 5; y++)
-            {
-                if (y == 3 || y == 4) continue; // the gap
-                CreateBuilding(wallDef, new Vector3Int(5, y, 0), grid,
-                    completed: true, scale: 1f, parent: container.transform);
-            }
-        }
-
-        private static void BuildEconomy(Grid grid, UnitDef villagerDef, TeamDef playerTeam)
-        {
-            // Town Center: completed 2x2 drop-off that also trains villagers.
-            BuildingDef tcDef = CreateTownCenterDef();
-            tcDef.trains = new[] { villagerDef };
-            EditorUtility.SetDirty(tcDef);
-            AssetDatabase.SaveAssets();
-
-            CreateBuilding(tcDef, new Vector3Int(-3, 0, 0), grid,
-                completed: true, scale: 1f, parent: null, team: playerTeam);
-
-            // Trees (Wood).
-            Sprite treeSprite = CreateOrLoadSprite(
-                "res_tree",
-                () => MakeCircleTexture(64, new Color32(46, 110, 56, 255), new Color32(24, 60, 30, 255)),
-                ppu: 70f);
-            var forest = new GameObject("Forest");
-            Vector3Int[] trees =
-            {
-                new(-7, 1, 0), new(-7, 0, 0), new(-7, -1, 0),
-                new(-6, 1, 0), new(-6, 0, 0), new(-6, -1, 0),
-            };
-            foreach (Vector3Int c in trees)
-                CreateResourceNode(forest.transform, treeSprite, grid, c, ResourceType.Wood, 100, "Tree");
-
-            // Berry bushes (Food).
-            Sprite bushSprite = CreateOrLoadSprite(
-                "res_bush",
-                () => MakeCircleTexture(48, new Color32(196, 64, 78, 255), new Color32(110, 30, 40, 255)),
-                ppu: 90f);
-            var bushes = new GameObject("Berries");
-            Vector3Int[] bushCells =
-            {
-                new(-3, 3, 0), new(-2, 3, 0), new(-1, 3, 0),
-            };
-            foreach (Vector3Int c in bushCells)
-                CreateResourceNode(bushes.transform, bushSprite, grid, c, ResourceType.Food, 75, "Bush");
-
-            // Gold mines.
-            Sprite goldSprite = CreateOrLoadSprite(
-                "res_gold",
-                () => MakeCircleTexture(56, new Color32(230, 200, 60, 255), new Color32(120, 100, 20, 255)),
-                ppu: 80f);
-            var goldNodes = new GameObject("GoldMines");
-            Vector3Int[] goldCells =
-            {
-                new(-10, 3, 0), new(-11, 3, 0), new(-10, 2, 0),
-            };
-            foreach (Vector3Int c in goldCells)
-                CreateResourceNode(goldNodes.transform, goldSprite, grid, c, ResourceType.Gold, 150, "Gold");
-
-            // Stone mines.
-            Sprite stoneSprite = CreateOrLoadSprite(
-                "res_stone",
-                () => MakeCircleTexture(56, new Color32(150, 150, 160, 255), new Color32(70, 70, 80, 255)),
-                ppu: 80f);
-            var stoneNodes = new GameObject("StoneMines");
-            Vector3Int[] stoneCells =
-            {
-                new(-10, -3, 0), new(-11, -3, 0), new(-10, -2, 0),
-            };
-            foreach (Vector3Int c in stoneCells)
-                CreateResourceNode(stoneNodes.transform, stoneSprite, grid, c, ResourceType.Stone, 150, "Stone");
-        }
-
-        private static void BuildEnemy(Grid grid, TeamDef enemyTeam, GameObject soldierPrefab)
-        {
-            var container = new GameObject("Enemy");
-
-            // Enemy camp (a destructible building) on the right side of the map.
-            CreateBuilding(CreateEnemyCampDef(), new Vector3Int(12, 0, 0), grid,
-                completed: true, scale: 1f, parent: container.transform, team: enemyTeam);
-
-            // A couple of enemy soldiers guarding it (defensive, leashed to their post).
-            Vector3Int[] guards = { new(11, 2, 0), new(11, -2, 0) };
-            foreach (Vector3Int cell in guards)
-            {
-                var go = (GameObject)PrefabUtility.InstantiatePrefab(soldierPrefab);
-                go.transform.SetParent(container.transform);
-                Vector3 p = grid.GetCellCenterWorld(cell);
-                p.z = 0f;
-                go.transform.position = p;
-
-                var owner = go.GetComponent<Owner>();
-                if (owner != null) owner.team = enemyTeam;
-
-                var combatant = go.GetComponent<Combatant>();
-                if (combatant != null)
-                {
-                    combatant.mobile = true;    // defends but does not roam
-                    combatant.guardRadius = 7f; // leashed to its post
-                }
-            }
-        }
-
-        private static Building CreateBuilding(BuildingDef def, Vector3Int originCell, Grid grid,
-            bool completed, float scale, Transform parent, TeamDef team = null)
-        {
-            var go = new GameObject(def.displayName);
-            if (parent != null) go.transform.SetParent(parent);
-
-            Vector3 a = grid.GetCellCenterWorld(originCell);
-            Vector3 b = grid.GetCellCenterWorld(new Vector3Int(
-                originCell.x + Mathf.Max(1, def.footprint.x) - 1,
-                originCell.y + Mathf.Max(1, def.footprint.y) - 1, 0));
-            Vector3 center = (a + b) * 0.5f;
-            center.z = 0f;
-            go.transform.position = center;
-            if (!Mathf.Approximately(scale, 1f))
-                go.transform.localScale = new Vector3(scale, scale, 1f);
-
-            var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = def.sprite;
-            sr.sortingOrder = 2;
-
-            var col = go.AddComponent<CircleCollider2D>();
-            col.radius = 0.4f * Mathf.Max(1, Mathf.Max(def.footprint.x, def.footprint.y));
-
-            if (team != null)
-            {
-                var owner = go.AddComponent<Owner>();
-                owner.team = team;
-                owner.applyTeamColor = false; // buildings keep their type color
-            }
-
-            if (def.maxHealth > 0)
-            {
-                var health = go.AddComponent<Health>();
-                health.maxHealth = def.maxHealth;
-            }
-
-            var building = go.AddComponent<Building>();
-            building.def = def;
-            building.originCell = new Vector2Int(originCell.x, originCell.y);
-            building.startCompleted = completed;
-            return building;
-        }
-
-        private static void CreateResourceNode(Transform parent, Sprite sprite, Grid grid,
-            Vector3Int cell, ResourceType type, int amount, string label)
-        {
-            var go = new GameObject($"{label}_{cell.x}_{cell.y}");
-            go.transform.SetParent(parent);
-            Vector3 p = grid.GetCellCenterWorld(cell);
-            p.z = 0f;
-            go.transform.position = p;
+            var go = new GameObject(assetName);
 
             var sr = go.AddComponent<SpriteRenderer>();
             sr.sprite = sprite;
             sr.sortingOrder = 2;
 
-            var col = go.AddComponent<CircleCollider2D>();
-            col.radius = 0.4f;
+            go.AddComponent<CircleCollider2D>().radius = 0.4f * Mathf.Max(1, Mathf.Max(footprint.x, footprint.y));
 
-            var node = go.AddComponent<ResourceNode>();
-            node.resourceType = type;
-            node.amount = amount;
+            var owner = go.AddComponent<Owner>();
+            owner.applyTeamColor = false; // buildings keep their type color; team is set at spawn
+
+            var health = go.AddComponent<Health>();
+            health.maxHealth = maxHealth;
+
+            var building = go.AddComponent<Building>();
+            building.displayName = displayName;
+            building.footprint = footprint;
+            building.woodCost = woodCost;
+            building.buildTime = buildTime;
+            building.populationProvided = population;
+            building.isDropoff = dropoff;
+            building.trains = trains;
+
+            GameObject prefab = PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
+            Object.DestroyImmediate(go);
+            return prefab;
         }
 
         // ----------------------------------------------------------- data defs
-
-        private static BuildingDef CreateWallDef() =>
-            CreateBuildingDef("Wall", "obstacle_rock", new Color32(90, 84, 78, 255), 256, 128,
-                new Vector2Int(1, 1), woodCost: 5, buildTime: 3f, population: 0, dropoff: false, maxHealth: 0);
-
-        private static BuildingDef CreateHouseDef() =>
-            CreateBuildingDef("House", "building_house", new Color32(150, 96, 70, 255), 512, 256,
-                new Vector2Int(2, 2), woodCost: 50, buildTime: 8f, population: 5, dropoff: false, maxHealth: 200);
-
-        private static BuildingDef CreateTownCenterDef() =>
-            CreateBuildingDef("TownCenter", "building_town_center", new Color32(200, 170, 120, 255), 512, 256,
-                new Vector2Int(2, 2), woodCost: 0, buildTime: 1f, population: 0, dropoff: true, maxHealth: 300,
-                displayName: "Town Center");
-
-        private static BuildingDef CreateBarracksDef(UnitDef soldierDef)
-        {
-            BuildingDef def = CreateBuildingDef("Barracks", "building_barracks", new Color32(120, 125, 135, 255),
-                512, 256, new Vector2Int(2, 2), woodCost: 175, buildTime: 12f, population: 0, dropoff: false,
-                maxHealth: 500);
-            def.trains = new[] { soldierDef };
-            EditorUtility.SetDirty(def);
-            AssetDatabase.SaveAssets();
-            return def;
-        }
-
-        private static BuildingDef CreateEnemyCampDef() =>
-            CreateBuildingDef("EnemyCamp", "building_enemy_camp", new Color32(120, 50, 50, 255), 512, 256,
-                new Vector2Int(2, 2), woodCost: 0, buildTime: 1f, population: 0, dropoff: false, maxHealth: 400,
-                displayName: "Enemy Camp");
-
-        private static BuildingDef CreateBuildingDef(string assetName, string spriteName, Color32 color,
-            int spriteW, int spriteH, Vector2Int footprint, int woodCost, float buildTime, int population,
-            bool dropoff, int maxHealth, string displayName = null)
-        {
-            EnsureFolder("Assets/Data");
-            EnsureFolder("Assets/Data/Buildings");
-
-            Sprite sprite = CreateOrLoadSprite(spriteName,
-                () => MakeDiamondTexture(spriteW, spriteH, color), ppu: 256f);
-
-            string path = $"Assets/Data/Buildings/{assetName}.asset";
-            var def = AssetDatabase.LoadAssetAtPath<BuildingDef>(path);
-            if (def == null)
-            {
-                def = ScriptableObject.CreateInstance<BuildingDef>();
-                AssetDatabase.CreateAsset(def, path);
-            }
-
-            def.displayName = displayName ?? assetName;
-            def.footprint = footprint;
-            def.woodCost = woodCost;
-            def.buildTime = buildTime;
-            def.populationProvided = population;
-            def.isDropoff = dropoff;
-            def.maxHealth = maxHealth;
-            def.trains = null;
-            def.sprite = sprite;
-            EditorUtility.SetDirty(def);
-            AssetDatabase.SaveAssets();
-            return def;
-        }
-
-        private static UnitDef CreateVillagerDef(GameObject prefab) =>
-            CreateUnitDef("Villager", prefab, foodCost: 50, trainTime: 6f);
-
-        private static UnitDef CreateSoldierDef(GameObject prefab) =>
-            CreateUnitDef("Soldier", prefab, foodCost: 60, trainTime: 8f);
-
-        private static UnitDef CreateUnitDef(string assetName, GameObject prefab, int foodCost, float trainTime)
-        {
-            EnsureFolder("Assets/Data");
-            EnsureFolder("Assets/Data/Units");
-
-            string path = $"Assets/Data/Units/{assetName}.asset";
-            var def = AssetDatabase.LoadAssetAtPath<UnitDef>(path);
-            if (def == null)
-            {
-                def = ScriptableObject.CreateInstance<UnitDef>();
-                AssetDatabase.CreateAsset(def, path);
-            }
-
-            def.displayName = assetName;
-            def.foodCost = foodCost;
-            def.woodCost = 0;
-            def.trainTime = trainTime;
-            def.populationCost = 1;
-            def.prefab = prefab;
-            EditorUtility.SetDirty(def);
-            AssetDatabase.SaveAssets();
-            return def;
-        }
 
         private static TeamDef CreateTeamDef(string name, Color color, int food, int wood, int gold, int stone,
             int basePopulation)

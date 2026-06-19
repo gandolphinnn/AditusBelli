@@ -36,10 +36,8 @@ namespace AditusBelli.UI
                 new Vector2(0f, 1f), new Vector2(12f, -8f), new Vector2(200f, 18f))
                 .GetComponent<Text>().text = "Build";
 
-            string houseCaption = _placer != null && _placer.houseDef != null
-                ? $"House ({_placer.houseDef.woodCost}W)" : "House";
-            string barracksCaption = _placer != null && _placer.barracksDef != null
-                ? $"Barracks ({_placer.barracksDef.woodCost}W)" : "Barracks";
+            string houseCaption = BuildCaption("House", _placer != null ? _placer.houseDef : null);
+            string barracksCaption = BuildCaption("Barracks", _placer != null ? _placer.barracksDef : null);
 
             Button house = UiFactory.Button(panel, "HouseBtn", houseCaption,
                 () => { if (_placer != null) _placer.BeginPlacement(_placer.houseDef); });
@@ -99,8 +97,10 @@ namespace AditusBelli.UI
             _productionGroup.gameObject.SetActive(show);
             if (!show) return;
 
-            UnitDef def = producer.FirstTrainable;
-            _trainLabel.text = $"Train {def.displayName} ({def.foodCost}F)";
+            UnitStats stats = producer.FirstTrainable.GetComponent<UnitStats>();
+            _trainLabel.text = stats != null
+                ? $"Train {stats.displayName} ({stats.foodCost}F)"
+                : "Train";
 
             string queue = $"Queue: {producer.QueueCount}";
             if (producer.QueueCount > 0) queue += $"   training {Mathf.RoundToInt(producer.Progress * 100f)}%";
@@ -135,6 +135,13 @@ namespace AditusBelli.UI
             Building b = sm != null ? sm.SelectedBuilding : null;
             if (b == null || !b.IsComplete) return null;
             return b.GetComponent<UnitProducer>();
+        }
+
+        /// <summary>Button caption like "House (50W)", reading the cost off the prefab.</summary>
+        private static string BuildCaption(string name, GameObject prefab)
+        {
+            var b = prefab != null ? prefab.GetComponent<Building>() : null;
+            return b != null ? $"{name} ({b.woodCost}W)" : name;
         }
     }
 }

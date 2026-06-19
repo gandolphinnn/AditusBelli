@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using AditusBelli.Buildings;
-using AditusBelli.Combat;
 using AditusBelli.Economy;
 using AditusBelli.Map;
 using AditusBelli.Teams;
@@ -12,15 +11,16 @@ namespace AditusBelli.Game
     /// Sets up a match at runtime on the procedurally generated map: places one Town
     /// Center per team and the scattered resource nodes from the generator's
     /// <see cref="MatchLayout"/>, spawns the starting villagers next to each base, and
-    /// centers the camera on the local player's base. Terrain + layout come from
-    /// <see cref="WorldMapGenerator"/>.
+    /// centers the camera on the local player's base. Town Center and Barracks are
+    /// prefabs that carry their own <see cref="Building"/> definition. Terrain +
+    /// layout come from <see cref="WorldMapGenerator"/>.
     /// </summary>
     public class MatchSetup : MonoBehaviour
     {
-        [Tooltip("Town Center definition (sprite, health, trains villagers).")]
-        public BuildingDef townCenterDef;
-        [Tooltip("Barracks definition: enemy teams start with one and train soldiers from it.")]
-        public BuildingDef barracksDef;
+        [Tooltip("Town Center building prefab (trains villagers, acts as a drop-off).")]
+        public GameObject townCenterDef;
+        [Tooltip("Barracks building prefab: enemy teams start with one and train soldiers from it.")]
+        public GameObject barracksDef;
         [Tooltip("Villager prefab spawned next to each city center at game start.")]
         public GameObject villagerPrefab;
         [Min(0)] public int villagersPerTeam = 3;
@@ -43,7 +43,7 @@ namespace AditusBelli.Game
             var generator = FindAnyObjectByType<WorldGeneratorBase>();
             if (grid == null || generator == null || townCenterDef == null)
             {
-                Debug.LogError("[MatchSetup] Missing GameGrid, world generator or Town Center def.");
+                Debug.LogError("[MatchSetup] Missing GameGrid, world generator or Town Center prefab.");
                 return;
             }
 
@@ -70,29 +70,20 @@ namespace AditusBelli.Game
             CenterCamera(grid, layout, teams, teamManager);
         }
 
-        private static Building CreateBuilding(GameGrid grid, Vector2Int origin, BuildingDef def, TeamDef team)
+        /// <summary>Instantiates a building prefab at a cell origin, owned by a team, completed.</summary>
+        private static Building CreateBuilding(GameGrid grid, Vector2Int origin, GameObject prefab, TeamDef team)
         {
-            int fx = Mathf.Max(1, def.footprint.x);
-            int fy = Mathf.Max(1, def.footprint.y);
+            var def = prefab.GetComponent<Building>();
+            int fx = Mathf.Max(1, def != null ? def.footprint.x : 1);
+            int fy = Mathf.Max(1, def != null ? def.footprint.y : 1);
 
-            var go = new GameObject(def.displayName);
-            go.transform.position = FootprintCenter(grid, origin, fx, fy);
+            Vector3 pos = FootprintCenter(grid, origin, fx, fy);
+            GameObject go = Instantiate(prefab, pos, Quaternion.identity);
 
-            var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = def.sprite;
-            sr.sortingOrder = 2;
+            var owner = go.GetComponent<Owner>();
+            if (owner != null) owner.team = team;
 
-            go.AddComponent<CircleCollider2D>().radius = 0.4f * Mathf.Max(fx, fy);
-
-            var owner = go.AddComponent<Owner>();
-            owner.team = team;
-            owner.applyTeamColor = false; // buildings keep their type color
-
-            // Init (not just the field) because Awake already ran on AddComponent.
-            go.AddComponent<Health>().Init(def.maxHealth);
-
-            var building = go.AddComponent<Building>();
-            building.def = def;
+            var building = go.GetComponent<Building>();
             building.originCell = origin;
             building.startCompleted = true;
             return building;
@@ -102,9 +93,11 @@ namespace AditusBelli.Game
         {
             if (barracksDef == null) return;
 
-            var tcSize = new Vector2Int(Mathf.Max(1, townCenterDef.footprint.x),
-                                        Mathf.Max(1, townCenterDef.footprint.y));
-            if (!TryFindBuildable(grid, ccOrigin, tcSize, barracksDef.footprint, out Vector2Int barracksOrigin))
+            var barracksBuilding = barracksDef.GetComponent<Building>();
+            if (barracksBuilding == null) return;
+
+            Vector2Int tcSize = TownCenterFootprint();
+            if (!TryFindBuildable(grid, ccOrigin, tcSize, barracksBuilding.footprint, out Vector2Int barracksOrigin))
                 return; // no room near the base; skip (the AI just won't have a barracks)
 
             Building barracks = CreateBuilding(grid, barracksOrigin, barracksDef, team);
@@ -158,8 +151,8 @@ namespace AditusBelli.Game
         {
             if (villagerPrefab == null || villagersPerTeam <= 0) return;
 
-            int fx = Mathf.Max(1, townCenterDef.footprint.x);
-            int fy = Mathf.Max(1, townCenterDef.footprint.y);
+            Vector2Int fp = TownCenterFootprint();
+            int fx = fp.x, fy = fp.y;
 
             // Walkable cells near the base, excluding the city-center footprint.
             var candidates = new List<Vector2Int>();
@@ -219,9 +212,18 @@ namespace AditusBelli.Game
             for (int i = 0; i < teams.Length; i++) if (teams[i] == teamManager.localPlayer) { idx = i; break; }
             if (idx >= layout.CityCenters.Count) return;
 
-            Vector3 c = FootprintCenter(grid, layout.CityCenters[idx],
-                Mathf.Max(1, townCenterDef.footprint.x), Mathf.Max(1, townCenterDef.footprint.y));
+            Vector2Int fp = TownCenterFootprint();
+            Vector3 c = FootprintCenter(grid, layout.CityCenters[idx], fp.x, fp.y);
             cam.transform.position = new Vector3(c.x, c.y, cam.transform.position.z);
+        }
+
+        /// <summary>The town-center prefab's footprint (clamped to at least 1x1).</summary>
+        private Vector2Int TownCenterFootprint()
+        {
+            var b = townCenterDef != null ? townCenterDef.GetComponent<Building>() : null;
+            return b != null
+                ? new Vector2Int(Mathf.Max(1, b.footprint.x), Mathf.Max(1, b.footprint.y))
+                : new Vector2Int(1, 1);
         }
 
         private static Vector3 FootprintCenter(GameGrid grid, Vector2Int origin, int fx, int fy)
