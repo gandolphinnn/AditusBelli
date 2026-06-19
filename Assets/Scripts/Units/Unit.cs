@@ -15,6 +15,8 @@ namespace AditusBelli.Units
         [Header("Movement")]
         public float moveSpeed = 3f;
         public float arriveThreshold = 0.05f;
+        [Tooltip("If true, the unit travels over open water instead of land (naval units).")]
+        public bool naval = false;
 
         [Header("Selection")]
         [Tooltip("Sprite shown under the unit when it is selected.")]
@@ -51,7 +53,7 @@ namespace AditusBelli.Units
             {
                 // With a grid we only ever follow a real path; we never walk in a
                 // straight line through obstacles. If there is no route, stay put.
-                List<Vector3> route = grid.FindPath(transform.position, worldPosition);
+                List<Vector3> route = grid.FindPath(transform.position, worldPosition, naval);
                 if (route != null && route.Count > 0)
                 {
                     _path.AddRange(route);

@@ -102,24 +102,46 @@ namespace AditusBelli.EditorTools
             // Unit prefabs (production stats live on a UnitStats component on the prefab).
             GameObject villagerPrefab = BuildUnitPrefab(playerTeam);
             GameObject soldierPrefab = BuildSoldierPrefab(playerTeam);
+            GameObject shipPrefab = BuildShipPrefab(playerTeam);
 
-            // Building prefabs (their definition lives on the Building component).
+            // Building sprites (colored isometric diamonds; 512x256 = 2x2 cells, 256x128 = 1x1).
             Sprite tcSprite = CreateOrLoadSprite("building_town_center",
                 () => MakeDiamondTexture(512, 256, new Color32(200, 170, 120, 255)), ppu: 256f);
             Sprite houseSprite = CreateOrLoadSprite("building_house",
                 () => MakeDiamondTexture(512, 256, new Color32(150, 96, 70, 255)), ppu: 256f);
+            Sprite warehouseSprite = CreateOrLoadSprite("building_warehouse",
+                () => MakeDiamondTexture(512, 256, new Color32(110, 150, 160, 255)), ppu: 256f);
             Sprite barracksSprite = CreateOrLoadSprite("building_barracks",
                 () => MakeDiamondTexture(512, 256, new Color32(120, 125, 135, 255)), ppu: 256f);
+            Sprite towerSprite = CreateOrLoadSprite("building_guard_tower",
+                () => MakeDiamondTexture(256, 128, new Color32(100, 110, 145, 255)), ppu: 256f);
+            Sprite wallSprite = CreateOrLoadSprite("building_wall",
+                () => MakeDiamondTexture(256, 128, new Color32(110, 104, 98, 255)), ppu: 256f);
+            Sprite dockSprite = CreateOrLoadSprite("building_dock",
+                () => MakeDiamondTexture(512, 256, new Color32(70, 110, 150, 255)), ppu: 256f);
 
+            // Building prefabs (their definition lives on the Building component).
             GameObject townCenterPrefab = BuildBuildingPrefab("TownCenter", "Town Center", tcSprite,
                 new Vector2Int(2, 2), woodCost: 0, buildTime: 1f, population: 0, dropoff: true,
                 maxHealth: 300, trains: new[] { villagerPrefab });
             GameObject housePrefab = BuildBuildingPrefab("House", "House", houseSprite,
                 new Vector2Int(2, 2), woodCost: 50, buildTime: 8f, population: 5, dropoff: false,
                 maxHealth: 200, trains: null);
+            GameObject warehousePrefab = BuildBuildingPrefab("Warehouse", "Warehouse", warehouseSprite,
+                new Vector2Int(2, 2), woodCost: 60, buildTime: 6f, population: 0, dropoff: true,
+                maxHealth: 200, trains: null);
             GameObject barracksPrefab = BuildBuildingPrefab("Barracks", "Barracks", barracksSprite,
                 new Vector2Int(2, 2), woodCost: 175, buildTime: 12f, population: 0, dropoff: false,
                 maxHealth: 500, trains: new[] { soldierPrefab });
+            GameObject towerPrefab = BuildBuildingPrefab("GuardTower", "Guard Tower", towerSprite,
+                new Vector2Int(1, 1), woodCost: 75, buildTime: 10f, population: 0, dropoff: false,
+                maxHealth: 250, trains: null, turretRange: 7f, turretDamage: 8, turretCooldown: 1f);
+            GameObject wallPrefab = BuildBuildingPrefab("Wall", "Wall", wallSprite,
+                new Vector2Int(1, 1), woodCost: 5, buildTime: 3f, population: 0, dropoff: false,
+                maxHealth: 600, trains: null);
+            GameObject dockPrefab = BuildBuildingPrefab("Dock", "Dock", dockSprite,
+                new Vector2Int(2, 2), woodCost: 100, buildTime: 12f, population: 0, dropoff: false,
+                maxHealth: 250, trains: new[] { shipPrefab }, requiresAdjacentWater: true);
 
             // Resource sprites used by the runtime match setup.
             Sprite woodSprite = CreateOrLoadSprite("res_tree",
@@ -145,8 +167,11 @@ namespace AditusBelli.EditorTools
             systemsGo.AddComponent<MatchManager>();
 
             var placer = systemsGo.AddComponent<BuildingPlacer>();
-            placer.houseDef = housePrefab;
-            placer.barracksDef = barracksPrefab;
+            // Build menu order (keys 1-9, then 0).
+            placer.buildable = new[]
+            {
+                housePrefab, warehousePrefab, barracksPrefab, towerPrefab, wallPrefab, dockPrefab,
+            };
 
             // Runtime match setup: one city center per team, scattered resources, and
             // starting villagers, all placed on the generated land.
@@ -353,7 +378,8 @@ namespace AditusBelli.EditorTools
 
         private static GameObject BuildBuildingPrefab(string assetName, string displayName, Sprite sprite,
             Vector2Int footprint, int woodCost, float buildTime, int population, bool dropoff, int maxHealth,
-            GameObject[] trains)
+            GameObject[] trains, float turretRange = 0f, int turretDamage = 0, float turretCooldown = 1f,
+            bool requiresAdjacentWater = false)
         {
             EnsureFolder("Assets/Prefabs/Buildings");
             string prefabPath = $"Assets/Prefabs/Buildings/{assetName}.prefab";
@@ -379,7 +405,62 @@ namespace AditusBelli.EditorTools
             building.buildTime = buildTime;
             building.populationProvided = population;
             building.isDropoff = dropoff;
+            building.requiresAdjacentWater = requiresAdjacentWater;
             building.trains = trains;
+
+            if (turretRange > 0f)
+            {
+                var turret = go.AddComponent<Turret>();
+                turret.range = turretRange;
+                turret.attackDamage = turretDamage;
+                turret.attackCooldown = turretCooldown;
+            }
+
+            GameObject prefab = PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
+            Object.DestroyImmediate(go);
+            return prefab;
+        }
+
+        // ----------------------------------------------------------------- ships
+
+        private static GameObject BuildShipPrefab(TeamDef team)
+        {
+            EnsureFolder("Assets/Prefabs/Units");
+            const string prefabPath = "Assets/Prefabs/Units/Ship.prefab";
+
+            // White hull so the team color tint defines the ship's color.
+            Sprite body = CreateOrLoadSprite(
+                "ship_body",
+                () => MakeEllipseTexture(64, new Color32(235, 235, 235, 255), new Color32(40, 40, 40, 255)),
+                ppu: 70f);
+            Sprite ring = CreateOrLoadSprite("selection_ring", () => MakeRingTexture(96, 48), ppu: 96f);
+
+            var go = new GameObject("Ship");
+            var sr = go.AddComponent<SpriteRenderer>();
+            sr.sprite = body;
+            sr.sortingOrder = 2;
+
+            var col = go.AddComponent<CircleCollider2D>();
+            col.radius = 0.34f;
+
+            var unit = go.AddComponent<Unit>();
+            unit.naval = true; // travels over open water
+
+            var owner = go.AddComponent<Owner>();
+            owner.team = team;
+            owner.applyTeamColor = true;
+
+            var health = go.AddComponent<Health>();
+            health.maxHealth = 60;
+
+            var stats = go.AddComponent<UnitStats>();
+            stats.displayName = "Ship";
+            stats.foodCost = 0;
+            stats.woodCost = 50;
+            stats.trainTime = 10f;
+            stats.populationCost = 1;
+
+            unit.selectionIndicator = AddSelectionRing(go, ring);
 
             GameObject prefab = PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
             Object.DestroyImmediate(go);
@@ -486,6 +567,32 @@ namespace AditusBelli.EditorTools
                 bool onBorder = x < margin + border || x >= size - margin - border ||
                                 y < margin + border || y >= size - margin - border;
                 px[y * size + x] = onBorder ? outline : fill;
+            }
+
+            tex.SetPixels32(px);
+            tex.Apply();
+            return tex;
+        }
+
+        // A horizontally-elongated ellipse (a boat hull seen from above).
+        private static Texture2D MakeEllipseTexture(int size, Color32 fill, Color32 outline)
+        {
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            var clear = new Color32(0, 0, 0, 0);
+            var px = new Color32[size * size];
+            float cx = size / 2f, cy = size / 2f;
+            float a = size / 2f - 1f;  // horizontal radius (full width)
+            float b = size / 3.2f;     // vertical radius (narrower -> hull-like)
+
+            for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                float dx = (x + 0.5f - cx) / a;
+                float dy = (y + 0.5f - cy) / b;
+                float d = dx * dx + dy * dy;
+                if (d <= 0.6724f) px[y * size + x] = fill;       // 0.82^2
+                else if (d <= 1f) px[y * size + x] = outline;
+                else px[y * size + x] = clear;
             }
 
             tex.SetPixels32(px);

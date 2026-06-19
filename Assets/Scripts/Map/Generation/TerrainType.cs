@@ -28,5 +28,9 @@ namespace AditusBelli.Map
         /// </summary>
         public static bool IsBuildable(this TerrainType t) =>
             t == TerrainType.Plain || t == TerrainType.Hill;
+
+        /// <summary>Whether naval units can travel here (open water).</summary>
+        public static bool IsWater(this TerrainType t) =>
+            t == TerrainType.Sea || t == TerrainType.DeepSea;
     }
 }

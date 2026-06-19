@@ -108,7 +108,7 @@ namespace AditusBelli.Buildings
         {
             if (prefab == null) return;
 
-            Vector3 spawn = ComputeSpawnPoint();
+            Vector3 spawn = ComputeSpawnPoint(prefab);
             GameObject go = Instantiate(prefab, spawn, Quaternion.identity);
 
             var spawnedOwner = go.GetComponent<Owner>();
@@ -121,10 +121,14 @@ namespace AditusBelli.Buildings
             }
         }
 
-        private Vector3 ComputeSpawnPoint()
+        private Vector3 ComputeSpawnPoint(GameObject prefab)
         {
             GameGrid grid = GameGrid.Instance;
             if (grid == null || _building == null) return transform.position;
+
+            // Naval units must appear on adjacent water; land units on adjacent land.
+            var unit = prefab != null ? prefab.GetComponent<Unit>() : null;
+            bool naval = unit != null && unit.naval;
 
             Vector2Int o = _building.originCell;
             Vector2Int s = _building.footprint;
@@ -136,7 +140,7 @@ namespace AditusBelli.Buildings
                 bool interior = dx >= 0 && dx < s.x && dy >= 0 && dy < s.y;
                 if (interior) continue;
                 var cell = new Vector2Int(o.x + dx, o.y + dy);
-                if (grid.IsWalkable(cell)) return grid.CellCenter(cell);
+                if (grid.IsWalkable(cell, naval)) return grid.CellCenter(cell);
             }
             return transform.position;
         }

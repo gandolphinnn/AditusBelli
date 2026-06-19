@@ -177,6 +177,7 @@ MonoBehaviour:
   buildTime: 8
   populationProvided: 5
   isDropoff: 0
+  requiresAdjacentWater: 0
   trains: []
   originCell: {x: 0, y: 0}
   startCompleted: 0

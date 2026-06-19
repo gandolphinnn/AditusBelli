@@ -24,6 +24,8 @@ namespace AditusBelli.Buildings
         public float buildTime = 8f;
         public int populationProvided = 0;
         public bool isDropoff = false;
+        [Tooltip("Requires at least one adjacent open-water cell to be placed (docks).")]
+        public bool requiresAdjacentWater = false;
         [Tooltip("Unit prefabs this building can train (each needs a UnitStats).")]
         public GameObject[] trains;
 

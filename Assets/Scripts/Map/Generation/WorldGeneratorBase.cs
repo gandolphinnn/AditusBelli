@@ -102,6 +102,13 @@ namespace AditusBelli.Map
             return _map.Get(centeredCell.x + _map.Width / 2, centeredCell.y + _map.Height / 2).IsWalkable();
         }
 
+        /// <summary>Whether a centered cell is open water (used by GameGrid for naval movement).</summary>
+        public bool IsWaterWorldCell(Vector2Int centeredCell)
+        {
+            if (_map == null) return false;
+            return _map.Get(centeredCell.x + _map.Width / 2, centeredCell.y + _map.Height / 2).IsWater();
+        }
+
         /// <summary>Generate once at full resolution if it hasn't been (for GameGrid, any Awake order).</summary>
         public void EnsureGenerated()
         {

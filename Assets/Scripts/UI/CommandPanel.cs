@@ -7,15 +7,13 @@ using UnityEngine.UI;
 namespace AditusBelli.UI
 {
     /// <summary>
-    /// Bottom-right command panel: clickable Build / Train / Cancel buttons, the
-    /// production queue read-out, and the placement hint. The Q/C and H/B hotkeys
-    /// keep working (Q/C handled here; H/B in BuildingPlacer). Replaces the old
-    /// IMGUI ProductionHud and BuildingPlacer hint.
+    /// Bottom-right command panel: the production queue read-out (Train / Cancel,
+    /// shown only when a producer building is selected) and the controls hint.
+    /// Building construction is driven by the separate build menu (B); Q/C train and
+    /// cancel here.
     /// </summary>
     public class CommandPanel : MonoBehaviour
     {
-        private BuildingPlacer _placer;
-
         private RectTransform _productionGroup;
         private Text _trainLabel;
         private Text _queueText;
@@ -27,27 +25,8 @@ namespace AditusBelli.UI
             RectTransform root = HudController.Instance != null ? HudController.Instance.Root : null;
             if (root == null) { enabled = false; return; }
 
-            _placer = FindAnyObjectByType<BuildingPlacer>();
-
             RectTransform panel = UiFactory.Panel(root, "CommandPanel", UiFactory.PanelColor);
-            UiFactory.Place(panel, new Vector2(1f, 0f), new Vector2(-8f, 8f), new Vector2(360f, 168f));
-
-            UiFactory.Place(UiFactory.Label(panel, "BuildHeader", 13, TextAnchor.UpperLeft).rectTransform,
-                new Vector2(0f, 1f), new Vector2(12f, -8f), new Vector2(200f, 18f))
-                .GetComponent<Text>().text = "Build";
-
-            string houseCaption = BuildCaption("House", _placer != null ? _placer.houseDef : null);
-            string barracksCaption = BuildCaption("Barracks", _placer != null ? _placer.barracksDef : null);
-
-            Button house = UiFactory.Button(panel, "HouseBtn", houseCaption,
-                () => { if (_placer != null) _placer.BeginPlacement(_placer.houseDef); });
-            UiFactory.Place(house.GetComponent<RectTransform>(),
-                new Vector2(0f, 1f), new Vector2(12f, -30f), new Vector2(160f, 28f));
-
-            Button barracks = UiFactory.Button(panel, "BarracksBtn", barracksCaption,
-                () => { if (_placer != null) _placer.BeginPlacement(_placer.barracksDef); });
-            UiFactory.Place(barracks.GetComponent<RectTransform>(),
-                new Vector2(0f, 1f), new Vector2(180f, -30f), new Vector2(168f, 28f));
+            UiFactory.Place(panel, new Vector2(1f, 0f), new Vector2(-8f, 8f), new Vector2(360f, 132f));
 
             // Production sub-group (visible only when a producer building is selected).
             _productionGroup = UiFactory.Container(panel, "Production");
@@ -55,19 +34,19 @@ namespace AditusBelli.UI
 
             Button train = UiFactory.Button(_productionGroup, "TrainBtn", "Train", TrainClicked);
             UiFactory.Place(train.GetComponent<RectTransform>(),
-                new Vector2(0f, 1f), new Vector2(12f, -64f), new Vector2(220f, 28f));
+                new Vector2(0f, 1f), new Vector2(12f, -8f), new Vector2(220f, 28f));
             _trainLabel = train.GetComponentInChildren<Text>();
 
             Button cancel = UiFactory.Button(_productionGroup, "CancelBtn", "Cancel", CancelClicked);
             UiFactory.Place(cancel.GetComponent<RectTransform>(),
-                new Vector2(0f, 1f), new Vector2(240f, -64f), new Vector2(108f, 28f));
+                new Vector2(0f, 1f), new Vector2(240f, -8f), new Vector2(108f, 28f));
 
             _queueText = UiFactory.Label(_productionGroup, "Queue", 12, TextAnchor.UpperLeft);
             UiFactory.Place(_queueText.rectTransform,
-                new Vector2(0f, 1f), new Vector2(12f, -96f), new Vector2(336f, 18f));
+                new Vector2(0f, 1f), new Vector2(12f, -42f), new Vector2(336f, 18f));
 
             RectTransform progBack = UiFactory.Panel(_productionGroup, "Progress", UiFactory.BarBackColor);
-            UiFactory.Place(progBack, new Vector2(0f, 1f), new Vector2(12f, -118f), new Vector2(336f, 12f));
+            UiFactory.Place(progBack, new Vector2(0f, 1f), new Vector2(12f, -64f), new Vector2(336f, 12f));
             _progressFill = UiFactory.Image(progBack, "ProgressFill", new Color(0.45f, 0.7f, 1f, 0.95f)).rectTransform;
             UiFactory.SetBar(_progressFill, 0f);
 
@@ -114,7 +93,7 @@ namespace AditusBelli.UI
         {
             _hint.text = BuildingPlacer.IsActive
                 ? "Placing: left-click to build, right-click / Esc to cancel"
-                : "H: House    B: Barracks    Q: train    C: cancel";
+                : "B: build menu     Q: train     C: cancel";
         }
 
         private void TrainClicked()
@@ -135,13 +114,6 @@ namespace AditusBelli.UI
             Building b = sm != null ? sm.SelectedBuilding : null;
             if (b == null || !b.IsComplete) return null;
             return b.GetComponent<UnitProducer>();
-        }
-
-        /// <summary>Button caption like "House (50W)", reading the cost off the prefab.</summary>
-        private static string BuildCaption(string name, GameObject prefab)
-        {
-            var b = prefab != null ? prefab.GetComponent<Building>() : null;
-            return b != null ? $"{name} ({b.woodCost}W)" : name;
         }
     }
 }

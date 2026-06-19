@@ -38,6 +38,7 @@ namespace AditusBelli.UI
             gameObject.AddComponent<ResourceBar>();
             gameObject.AddComponent<SelectionPanel>();
             gameObject.AddComponent<CommandPanel>();
+            gameObject.AddComponent<BuildMenu>();
             gameObject.AddComponent<SelectionBox>();
             gameObject.AddComponent<GameOverOverlay>();
             gameObject.AddComponent<Minimap>();

@@ -18,7 +18,8 @@ namespace AditusBelli.Map
         [SerializeField] private Tilemap groundTilemap;
 
         private Grid _grid;
-        private GridModel _model;
+        private GridModel _model;        // land walkability
+        private GridModel _navalModel;   // open-water walkability (naval units)
         private Bounds _worldBounds;
         private bool _worldBoundsValid;
 
@@ -95,9 +96,14 @@ namespace AditusBelli.Map
                 generator.EnsureGenerated();
                 RectInt b = generator.CenteredCellBounds;
                 _model = new GridModel(b.xMin, b.yMin, b.width, b.height);
+                _navalModel = new GridModel(b.xMin, b.yMin, b.width, b.height);
                 for (int y = b.yMin; y < b.yMax; y++)
                 for (int x = b.xMin; x < b.xMax; x++)
-                    _model.SetWalkable(x, y, generator.IsWalkableWorldCell(new Vector2Int(x, y)));
+                {
+                    var cell = new Vector2Int(x, y);
+                    _model.SetWalkable(x, y, generator.IsWalkableWorldCell(cell));
+                    _navalModel.SetWalkable(x, y, generator.IsWaterWorldCell(cell));
+                }
                 return;
             }
 
@@ -107,11 +113,13 @@ namespace AditusBelli.Map
             {
                 Debug.LogError("[GameGrid] No ground tilemap or generator found.");
                 _model = new GridModel(0, 0, 1, 1);
+                _navalModel = new GridModel(0, 0, 1, 1);
                 return;
             }
 
             BoundsInt b2 = groundTilemap.cellBounds;
             _model = new GridModel(b2.xMin, b2.yMin, b2.size.x, b2.size.y);
+            _navalModel = new GridModel(b2.xMin, b2.yMin, b2.size.x, b2.size.y); // no water on flat maps
             for (int y = b2.yMin; y < b2.yMax; y++)
             for (int x = b2.xMin; x < b2.xMax; x++)
                 _model.SetWalkable(x, y, groundTilemap.HasTile(new Vector3Int(x, y, 0)));
@@ -124,25 +132,34 @@ namespace AditusBelli.Map
 
         public bool IsWalkable(Vector2Int cell) => _model != null && _model.IsWalkable(cell);
 
+        /// <summary>Walkability in a movement domain: land (default) or naval (open water).</summary>
+        public bool IsWalkable(Vector2Int cell, bool naval)
+        {
+            GridModel model = naval ? _navalModel : _model;
+            return model != null && model.IsWalkable(cell);
+        }
+
         public void SetWalkable(Vector2Int cell, bool value) => _model?.SetWalkable(cell, value);
 
         /// <summary>
         /// Computes a path and returns world-space waypoints, excluding the start
-        /// cell. Returns null if no route exists.
+        /// cell. Returns null if no route exists. Set <paramref name="naval"/> to
+        /// route over open water instead of land.
         /// </summary>
-        public List<Vector3> FindPath(Vector3 worldStart, Vector3 worldGoal)
+        public List<Vector3> FindPath(Vector3 worldStart, Vector3 worldGoal, bool naval = false)
         {
-            if (_model == null) return null;
+            GridModel model = naval ? _navalModel : _model;
+            if (model == null) return null;
 
             Vector3Int s3 = _grid.WorldToCell(worldStart);
             Vector3Int g3 = _grid.WorldToCell(worldGoal);
             var start = new Vector2Int(s3.x, s3.y);
             var goal = new Vector2Int(g3.x, g3.y);
 
-            if (!_model.IsWalkable(goal) && !TryNearestWalkable(goal, out goal)) return null;
-            if (!_model.IsWalkable(start) && !TryNearestWalkable(start, out start)) return null;
+            if (!model.IsWalkable(goal) && !TryNearestWalkable(model, goal, out goal)) return null;
+            if (!model.IsWalkable(start) && !TryNearestWalkable(model, start, out start)) return null;
 
-            List<Vector2Int> cells = Pathfinder.FindPath(_model, start, goal);
+            List<Vector2Int> cells = Pathfinder.FindPath(model, start, goal);
             if (cells == null || cells.Count == 0) return null;
 
             var world = new List<Vector3>(cells.Count);
@@ -151,8 +168,8 @@ namespace AditusBelli.Map
             return world;
         }
 
-        /// <summary>Searches outward (ring by ring) for the closest walkable cell.</summary>
-        private bool TryNearestWalkable(Vector2Int from, out Vector2Int result, int maxRadius = 6)
+        /// <summary>Searches outward (ring by ring) for the closest walkable cell in a model.</summary>
+        private static bool TryNearestWalkable(GridModel model, Vector2Int from, out Vector2Int result, int maxRadius = 6)
         {
             for (int r = 1; r <= maxRadius; r++)
             {
@@ -161,7 +178,7 @@ namespace AditusBelli.Map
                 {
                     if (Mathf.Abs(dx) != r && Mathf.Abs(dy) != r) continue; // ring outline only
                     var c = new Vector2Int(from.x + dx, from.y + dy);
-                    if (_model.IsWalkable(c)) { result = c; return true; }
+                    if (model.IsWalkable(c)) { result = c; return true; }
                 }
             }
             result = from;

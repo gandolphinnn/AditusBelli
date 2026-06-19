@@ -241,6 +241,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AditusBelli.Units.Unit
   moveSpeed: 3
   arriveThreshold: 0.05
+  naval: 0
   selectionIndicator: {fileID: 8854160965735331766}
 --- !u!114 &7486243713034267411
 MonoBehaviour:
