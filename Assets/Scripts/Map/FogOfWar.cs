@@ -58,6 +58,20 @@ namespace AditusBelli.Map
             return _model.Get(c.x, c.y);
         }
 
+        /// <summary>
+        /// True if <paramref name="target"/> lies within a unit's sight radius of
+        /// <paramref name="from"/> — the same circular cell radius (<see cref="unitVision"/>)
+        /// used to uncover the fog. Geometry only, independent of whether the fog is shown.
+        /// </summary>
+        public bool IsWithinUnitSight(Vector3 from, Vector3 target)
+        {
+            if (_grid == null) return true;
+            Vector3Int a = _grid.WorldToCell(from);
+            Vector3Int b = _grid.WorldToCell(target);
+            int dx = a.x - b.x, dy = a.y - b.y;
+            return dx * dx + dy * dy <= unitVision * unitVision;
+        }
+
         public bool IsEnabled => _fogEnabled;
 
         private void Awake() => Instance = this;

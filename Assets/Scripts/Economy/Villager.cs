@@ -1,4 +1,5 @@
 using AditusBelli.Buildings;
+using AditusBelli.Map;
 using AditusBelli.Units;
 using UnityEngine;
 
@@ -26,12 +27,17 @@ namespace AditusBelli.Economy
         private int _carried;
         private float _gatherAccumulator;
         private ResourceType _carriedType;
+        private Vector3 _lastNodePosition; // where this villager last gathered (sight origin)
 
         public int CarriedAmount => _carried;
         public ResourceType CarriedType => _carriedType;
         public int CarryCapacity => carryCapacity;
 
-        private void Awake() => _unit = GetComponent<Unit>();
+        private void Awake()
+        {
+            _unit = GetComponent<Unit>();
+            _lastNodePosition = transform.position;
+        }
 
         public void GatherFrom(ResourceNode node)
         {
@@ -90,6 +96,7 @@ namespace AditusBelli.Economy
             if (_node == null || _node.IsDepleted) { GoDeposit(); return; }
 
             _carriedType = _node.resourceType;
+            _lastNodePosition = transform.position; // remember where we emptied it from
 
             // Gather whole units at the gather rate, so resource totals stay exact.
             _gatherAccumulator += gatherRate * Time.deltaTime;
@@ -126,7 +133,9 @@ namespace AditusBelli.Economy
                 return;
             }
 
-            ResourceNode next = NearestNode(_carriedType);
+            // Auto-continue to another source only if one is within the villager's
+            // sight range (the fog-uncover radius) of where the last node was emptied.
+            ResourceNode next = NearestNodeInSight(_carriedType, _lastNodePosition);
             if (next != null)
             {
                 _node = next;
@@ -180,13 +189,21 @@ namespace AditusBelli.Economy
             return (a - p).sqrMagnitude <= range * range;
         }
 
-        private ResourceNode NearestNode(ResourceType type)
+        /// <summary>
+        /// Nearest non-depleted node of the given type whose position is within unit
+        /// sight (the fog-uncover radius) of <paramref name="sightOrigin"/>. Distance is
+        /// still measured from the villager so it walks to the closest eligible source.
+        /// With no fog of war present, the sight filter is skipped (any node qualifies).
+        /// </summary>
+        private ResourceNode NearestNodeInSight(ResourceType type, Vector3 sightOrigin)
         {
+            FogOfWar fog = FogOfWar.Instance;
             ResourceNode best = null;
             float bestSq = float.MaxValue;
             foreach (ResourceNode n in ResourceNode.All)
             {
                 if (n == null || n.IsDepleted || n.resourceType != type) continue;
+                if (fog != null && !fog.IsWithinUnitSight(sightOrigin, n.transform.position)) continue;
                 float sq = (n.transform.position - transform.position).sqrMagnitude;
                 if (sq < bestSq) { bestSq = sq; best = n; }
             }

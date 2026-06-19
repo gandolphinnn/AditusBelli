@@ -50,7 +50,7 @@ namespace AditusBelli.UI
 
         private static void EnsureEventSystem()
         {
-            if (FindFirstObjectByType<EventSystem>() != null) return;
+            if (FindAnyObjectByType<EventSystem>() != null) return;
 
             // New Input System only: must use InputSystemUIInputModule, not the
             // legacy StandaloneInputModule (which throws under activeInputHandler 1).

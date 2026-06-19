@@ -38,7 +38,7 @@ namespace AditusBelli.Game
         private void Start()
         {
             GameGrid grid = GameGrid.Instance;
-            var generator = FindFirstObjectByType<WorldGeneratorBase>();
+            var generator = FindAnyObjectByType<WorldGeneratorBase>();
             if (grid == null || generator == null || townCenterDef == null)
             {
                 Debug.LogError("[MatchSetup] Missing GameGrid, world generator or Town Center def.");

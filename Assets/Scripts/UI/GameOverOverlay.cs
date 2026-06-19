@@ -19,7 +19,7 @@ namespace AditusBelli.UI
             RectTransform root = HudController.Instance != null ? HudController.Instance.Root : null;
             if (root == null) { enabled = false; return; }
 
-            _match = FindFirstObjectByType<MatchManager>();
+            _match = FindAnyObjectByType<MatchManager>();
 
             _overlay = UiFactory.Panel(root, "GameOverOverlay", new Color(0f, 0f, 0f, 0.55f));
             UiFactory.Stretch(_overlay);

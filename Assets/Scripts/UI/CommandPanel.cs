@@ -27,7 +27,7 @@ namespace AditusBelli.UI
             RectTransform root = HudController.Instance != null ? HudController.Instance.Root : null;
             if (root == null) { enabled = false; return; }
 
-            _placer = FindFirstObjectByType<BuildingPlacer>();
+            _placer = FindAnyObjectByType<BuildingPlacer>();
 
             RectTransform panel = UiFactory.Panel(root, "CommandPanel", UiFactory.PanelColor);
             UiFactory.Place(panel, new Vector2(1f, 0f), new Vector2(-8f, 8f), new Vector2(360f, 168f));
