@@ -10,10 +10,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9059fac96b961994190ea34c908705a5, type: 3}
-  m_Name: Player
+  m_Name: Bot2
   m_EditorClassIdentifier: Assembly-CSharp::AditusBelli.Teams.TeamDef
-  displayName: Player
-  color: {r: 0.35, g: 0.55, b: 0.95, a: 1}
+  displayName: Bot2
+  color: {r: 0.796, g: 0.896, b: 0.038, a: 1}
   startFood: 200
   startWood: 300
   startGold: 100

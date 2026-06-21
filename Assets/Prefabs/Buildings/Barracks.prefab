@@ -144,7 +144,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AditusBelli.Buildings.Building
   team: {fileID: 0}
   applyTeamColor: 0
-  maxHealth: 500
+  maxHealth: 400
   displayName: Barracks
   footprint: {x: 2, y: 2}
   woodCost: 175

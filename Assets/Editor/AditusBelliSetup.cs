@@ -90,14 +90,18 @@ namespace AditusBelli.EditorTools
             generator.worldType = WorldType.Pangea;
             generator.size = WorldSize.Medium;
             generator.resources = ResourceAmount.Abundant;
-            generator.playerCount = 2;
+            generator.playerCount = 4; // 1 player + 3 bots (one city center each)
             generator.seed = -1038437759; // preserved from the tuned WorldGen scene
 
-            // Teams (faction data is editable on these assets in the Inspector). The
-            // enemy gets a generous base population so its AI can field escalating
-            // waves without having to manage houses; the player builds houses normally.
-            TeamDef playerTeam = CreateTeamDef("Player", new Color(0.35f, 0.55f, 0.95f), 200, 300, 100, 100, 8);
-            TeamDef enemyTeam = CreateTeamDef("Enemy", new Color(0.90f, 0.35f, 0.30f), 200, 300, 100, 100, 40);
+            // Teams (faction data is editable on these assets in the Inspector). The game
+            // supports 1 human player + up to 3 bots; all four faction assets are
+            // maintained here and the match currently runs the full roster (see
+            // TeamManager.teams below). To field fewer opponents, drop entries from
+            // teamManager.teams and lower generator.playerCount to match.
+            TeamDef playerTeam = CreateTeamDef("Player", new Color(0.35f, 0.55f, 0.95f), 200, 300, 100, 100, 5);
+            TeamDef bot1Team = CreateTeamDef("Bot1", new Color(0.90f, 0.35f, 0.30f), 200, 300, 100, 100, 5);
+            TeamDef bot2Team = CreateTeamDef("Bot2", new Color(0.796f, 0.896f, 0.038f), 200, 300, 100, 100, 5);
+            TeamDef bot3Team = CreateTeamDef("Bot3", new Color(0.219f, 0.067f, 0.679f), 200, 300, 100, 100, 5);
 
             // Unit prefabs (production stats live on a UnitStats component on the prefab).
             GameObject villagerPrefab = BuildUnitPrefab(playerTeam);
@@ -132,7 +136,7 @@ namespace AditusBelli.EditorTools
                 maxHealth: 200, trains: null);
             GameObject barracksPrefab = BuildBuildingPrefab("Barracks", "Barracks", barracksSprite,
                 new Vector2Int(2, 2), woodCost: 175, buildTime: 12f, population: 0, dropoff: false,
-                maxHealth: 500, trains: new[] { soldierPrefab });
+                maxHealth: 400, trains: new[] { soldierPrefab });
             GameObject towerPrefab = BuildBuildingPrefab("GuardTower", "Guard Tower", towerSprite,
                 new Vector2Int(1, 1), woodCost: 75, buildTime: 10f, population: 0, dropoff: false,
                 maxHealth: 250, trains: null, turretRange: 7f, turretDamage: 8, turretCooldown: 1f);
@@ -160,8 +164,10 @@ namespace AditusBelli.EditorTools
 
             // TeamManager owns the per-team economies (resources + population),
             // seeded from each TeamDef on first use. No standalone player economy.
+            // Active match = 1 player + 3 bots (full roster). Trim this array and lower
+            // generator.playerCount together to field fewer opponents.
             var teamManager = systemsGo.AddComponent<TeamManager>();
-            teamManager.teams = new[] { playerTeam, enemyTeam };
+            teamManager.teams = new[] { playerTeam, bot1Team, bot2Team, bot3Team };
             teamManager.localPlayer = playerTeam;
 
             systemsGo.AddComponent<MatchManager>();

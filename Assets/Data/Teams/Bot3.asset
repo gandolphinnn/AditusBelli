@@ -10,12 +10,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9059fac96b961994190ea34c908705a5, type: 3}
-  m_Name: Enemy
+  m_Name: Bot3
   m_EditorClassIdentifier: Assembly-CSharp::AditusBelli.Teams.TeamDef
-  displayName: Enemy
-  color: {r: 0.9, g: 0.35, b: 0.3, a: 1}
+  displayName: Bot3
+  color: {r: 0.219, g: 0.067, b: 0.679, a: 1}
   startFood: 200
   startWood: 300
   startGold: 100
   startStone: 100
-  basePopulation: 40
+  basePopulation: 5
