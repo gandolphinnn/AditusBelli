@@ -38,20 +38,23 @@ namespace AditusBelli.Game
             if (_timer > 0f) return;
             _timer = checkInterval;
 
-            TeamDef local = TeamManager.Instance != null ? TeamManager.Instance.LocalPlayer : null;
+            TeamManager tm = TeamManager.Instance;
+            TeamDef local = tm != null ? tm.LocalPlayer : null;
             if (local == null) return;
 
-            int playerBuildings = 0;
-            int enemyBuildings = 0;
+            // Player side = the local team and its allies; enemy side = everyone hostile
+            // to it. Conquest ends when one side has no buildings left.
+            int playerSide = 0;
+            int enemySide = 0;
             foreach (Building b in Building.AllBuildings)
             {
-                if (b == null || b.Team == null) continue; // neutral (e.g. walls)
-                if (b.Team == local) playerBuildings++;
-                else enemyBuildings++;
+                if (b == null || b.Team == null) continue; // unowned (e.g. neutral walls)
+                if (tm.AreEnemies(local, b.Team)) enemySide++;
+                else playerSide++;
             }
 
-            if (playerBuildings == 0) Decide(false);
-            else if (enemyBuildings == 0) Decide(true);
+            if (playerSide == 0) Decide(false);
+            else if (enemySide == 0) Decide(true);
         }
 
         private void Decide(bool victory)

@@ -10,23 +10,18 @@ using UnityEngine.Tilemaps;
 namespace AditusBelli.Map
 {
     /// <summary>
-    /// Standard 3-state fog of war (unseen / explored / visible). Maintains a
-    /// <see cref="VisibilityModel"/> revealed each tick by the local player's units
-    /// and buildings, renders it as a per-cell-tinted overlay tilemap aligned to the
-    /// isometric grid, and hides enemy units/buildings that are not currently in
-    /// sight. Re-fogs (demotes to explored) areas the player has left. No last-seen
-    /// memory: enemies vanish when out of sight. Press F to toggle the fog.
+    /// Renders the local player's fog of war. The visibility itself (unseen / explored
+    /// / visible) is computed per team by <see cref="TeamVision"/>; this component only
+    /// renders the local player's model as a per-cell-tinted overlay tilemap aligned to
+    /// the isometric grid, and hides enemy units/buildings that are not currently in
+    /// sight. Allies and own units are never hidden. Press F to toggle the fog.
     /// </summary>
     [RequireComponent(typeof(Grid))]
     public class FogOfWar : MonoBehaviour
     {
         public static FogOfWar Instance { get; private set; }
 
-        [Tooltip("Sight radius (in cells) of the local player's units.")]
-        public int unitVision = 6;
-        [Tooltip("Sight radius (in cells) of the local player's buildings.")]
-        public int buildingVision = 9;
-        [Tooltip("How often the fog is recomputed, in seconds.")]
+        [Tooltip("How often the rendered fog is refreshed, in seconds.")]
         public float refreshInterval = 0.1f;
 
         private static readonly Color UnseenColor = new Color(0f, 0f, 0f, 1f);
@@ -35,7 +30,8 @@ namespace AditusBelli.Map
 
         private GameGrid _grid;
         private TeamDef _localTeam;
-        private VisibilityModel _model;
+        private TeamVision _vision;
+        private VisibilityModel _model; // the local team's model, owned by TeamVision
 
         private Tilemap _fogMap;
         private TilemapRenderer _fogRenderer;
@@ -61,16 +57,17 @@ namespace AditusBelli.Map
 
         /// <summary>
         /// True if <paramref name="target"/> lies within a unit's sight radius of
-        /// <paramref name="from"/> — the same circular cell radius (<see cref="unitVision"/>)
+        /// <paramref name="from"/> — the same circular cell radius (<see cref="TeamVision.unitVision"/>)
         /// used to uncover the fog. Geometry only, independent of whether the fog is shown.
         /// </summary>
         public bool IsWithinUnitSight(Vector3 from, Vector3 target)
         {
             if (_grid == null) return true;
+            int radius = _vision != null ? _vision.unitVision : 6;
             Vector3Int a = _grid.WorldToCell(from);
             Vector3Int b = _grid.WorldToCell(target);
             int dx = a.x - b.x, dy = a.y - b.y;
-            return dx * dx + dy * dy <= unitVision * unitVision;
+            return dx * dx + dy * dy <= radius * radius;
         }
 
         public bool IsEnabled => _fogEnabled;
@@ -83,14 +80,20 @@ namespace AditusBelli.Map
             _grid = GameGrid.Instance;
             if (_grid == null) { enabled = false; return; }
 
+            _vision = TeamVision.Instance;
             _localTeam = TeamManager.Instance != null ? TeamManager.Instance.LocalPlayer : null;
+            // No vision service or no local team: skip the overlay (the map stays fully visible).
+            if (_vision == null || _localTeam == null) { enabled = false; return; }
+
+            _vision.RecomputeNow();                       // reveal immediately so the start area isn't black
+            _model = _vision.ModelForTeam(_localTeam);
+            if (_model == null) { enabled = false; return; }
 
             RectInt cb = _grid.CellBounds;
-            _model = new VisibilityModel(cb.xMin, cb.yMin, cb.width, cb.height);
             _pushed = new Visibility[cb.width * cb.height]; // defaults to Unseen, matching the initial fill
 
             BuildFogTilemap(cb);
-            UpdateFog(); // reveal immediately so the start area isn't black for a frame
+            UpdateFog();
         }
 
         private void Update()
@@ -173,33 +176,8 @@ namespace AditusBelli.Map
 
         private void UpdateFog()
         {
-            _model.DowngradeVisibleToExplored();
-            RevealSources();
             PushColors();
             HideEnemies();
-        }
-
-        private void RevealSources()
-        {
-            foreach (Unit u in UnitSelectionManager.AllUnits)
-            {
-                if (u == null || !IsLocal(u)) continue;
-                RevealAround(u.transform.position, unitVision);
-            }
-            foreach (Building b in Building.AllBuildings)
-            {
-                if (b == null || !IsLocal(b)) continue;
-                RevealAround(b.transform.position, buildingVision);
-            }
-        }
-
-        private void RevealAround(Vector3 world, int radius)
-        {
-            Vector3Int c = _grid.WorldToCell(world);
-            int r2 = radius * radius;
-            for (int dy = -radius; dy <= radius; dy++)
-            for (int dx = -radius; dx <= radius; dx++)
-                if (dx * dx + dy * dy <= r2) _model.Reveal(c.x + dx, c.y + dy);
         }
 
         private void PushColors()
@@ -269,9 +247,8 @@ namespace AditusBelli.Map
 
         // -------------------------------------------------------------- helpers
 
-        private bool IsLocal(Entity e) => e != null && e.Team != null && e.Team == _localTeam;
-
-        private bool IsEnemy(Entity e) => e != null && e.Team != null && e.Team != _localTeam;
+        private bool IsEnemy(Entity e) =>
+            e != null && TeamManager.Instance != null && TeamManager.Instance.AreEnemies(_localTeam, e.Team);
 
         private static Color ColorFor(Visibility s) => s switch
         {

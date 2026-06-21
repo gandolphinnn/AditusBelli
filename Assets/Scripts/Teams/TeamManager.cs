@@ -38,5 +38,23 @@ namespace AditusBelli.Teams
 
         /// <summary>The local player's economy (used by the HUD and player commands).</summary>
         public TeamEconomy LocalEconomy => EconomyFor(localPlayer);
+
+        // ----------------------------------------------------------- diplomacy
+
+        /// <summary>
+        /// Two teams are enemies when they are distinct and not allied. Alliance is
+        /// sharing an <see cref="TeamDef.allianceGroup"/> greater than 0; group 0 means
+        /// "unaligned" — hostile to everyone else (the default free-for-all). A null
+        /// team is neutral (never an enemy).
+        /// </summary>
+        public bool AreEnemies(TeamDef a, TeamDef b)
+        {
+            if (a == null || b == null || a == b) return false;
+            return !(a.allianceGroup > 0 && a.allianceGroup == b.allianceGroup);
+        }
+
+        /// <summary>Two distinct teams sharing an alliance group greater than 0.</summary>
+        public bool AreAllies(TeamDef a, TeamDef b) =>
+            a != null && b != null && a != b && a.allianceGroup > 0 && a.allianceGroup == b.allianceGroup;
     }
 }

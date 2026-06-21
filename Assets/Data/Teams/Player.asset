@@ -19,3 +19,4 @@ MonoBehaviour:
   startGold: 100
   startStone: 100
   basePopulation: 5
+  allianceGroup: 1

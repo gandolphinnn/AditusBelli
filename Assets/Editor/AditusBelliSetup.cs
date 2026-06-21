@@ -98,10 +98,14 @@ namespace AditusBelli.EditorTools
             // maintained here and the match currently runs the full roster (see
             // TeamManager.teams below). To field fewer opponents, drop entries from
             // teamManager.teams and lower generator.playerCount to match.
-            TeamDef playerTeam = CreateTeamDef("Player", new Color(0.35f, 0.55f, 0.95f), 200, 300, 100, 100, 5);
-            TeamDef bot1Team = CreateTeamDef("Bot1", new Color(0.90f, 0.35f, 0.30f), 200, 300, 100, 100, 5);
-            TeamDef bot2Team = CreateTeamDef("Bot2", new Color(0.796f, 0.896f, 0.038f), 200, 300, 100, 100, 5);
-            TeamDef bot3Team = CreateTeamDef("Bot3", new Color(0.219f, 0.067f, 0.679f), 200, 300, 100, 100, 5);
+            //
+            // The last argument is the alliance group: 0 = unaligned (hostile to everyone
+            // else — free-for-all). Teams sharing the SAME group > 0 are allies.
+            // Current scenario: Player + Bot3 (group 1) vs Bot1 + Bot2 (group 2).
+            TeamDef playerTeam = CreateTeamDef("Player", new Color(0.35f, 0.55f, 0.95f), 200, 300, 100, 100, 5, 1);
+            TeamDef bot1Team = CreateTeamDef("Bot1", new Color(0.90f, 0.35f, 0.30f), 200, 300, 100, 100, 5, 2);
+            TeamDef bot2Team = CreateTeamDef("Bot2", new Color(0.796f, 0.896f, 0.038f), 200, 300, 100, 100, 5, 2);
+            TeamDef bot3Team = CreateTeamDef("Bot3", new Color(0.219f, 0.067f, 0.679f), 200, 300, 100, 100, 5, 1);
 
             // Unit prefabs (production stats live on a UnitStats component on the prefab).
             GameObject villagerPrefab = BuildUnitPrefab(playerTeam);
@@ -172,6 +176,10 @@ namespace AditusBelli.EditorTools
 
             systemsGo.AddComponent<MatchManager>();
 
+            // Per-team line of sight: every team (player and bots) only acts on what it
+            // has actually seen. FogOfWar renders the local player's model from this.
+            systemsGo.AddComponent<TeamVision>();
+
             var placer = systemsGo.AddComponent<BuildingPlacer>();
             // Build menu order (keys 1-9, then 0).
             placer.buildable = new[]
@@ -183,9 +191,15 @@ namespace AditusBelli.EditorTools
             // starting villagers, all placed on the generated land.
             var match = systemsGo.AddComponent<MatchSetup>();
             match.townCenterDef = townCenterPrefab;
-            match.barracksDef = barracksPrefab;
             match.villagerPrefab = villagerPrefab;
             match.villagersPerTeam = 3;
+            // Bots build everything else themselves, so they get the full buildable set.
+            match.housePrefab = housePrefab;
+            match.warehousePrefab = warehousePrefab;
+            match.barracksPrefab = barracksPrefab;
+            match.guardTowerPrefab = towerPrefab;
+            match.wallPrefab = wallPrefab;
+            match.dockPrefab = dockPrefab;
             match.woodSprite = woodSprite;
             match.foodSprite = foodSprite;
             match.goldSprite = goldSprite;
@@ -460,7 +474,7 @@ namespace AditusBelli.EditorTools
         // ----------------------------------------------------------- data defs
 
         private static TeamDef CreateTeamDef(string name, Color color, int food, int wood, int gold, int stone,
-            int basePopulation)
+            int basePopulation, int allianceGroup = 0)
         {
             EnsureFolder("Assets/Data");
             EnsureFolder("Assets/Data/Teams");
@@ -480,6 +494,7 @@ namespace AditusBelli.EditorTools
             def.startGold = gold;
             def.startStone = stone;
             def.basePopulation = basePopulation;
+            def.allianceGroup = allianceGroup;
             EditorUtility.SetDirty(def);
             AssetDatabase.SaveAssets();
             return def;

@@ -39,6 +39,9 @@ namespace AditusBelli.Economy
         /// <summary>True while the villager has a task (gathering, depositing or building).</summary>
         public bool IsBusy => _state != State.Idle;
 
+        /// <summary>True while the villager is on its way to, or actively, constructing a building.</summary>
+        public bool IsBuilding => _state == State.ToBuild || _state == State.Building;
+
         private void Awake()
         {
             _unit = GetComponent<Unit>();

@@ -35,9 +35,17 @@ namespace AditusBelli.Entities
         public int Max => maxHealth;
         public bool IsAlive => _current > 0;
 
-        /// <summary>True when this entity belongs to a different (non-null) team than the other.</summary>
-        public bool IsHostileTo(Entity other) =>
-            other != null && team != null && other.team != null && other.team != team;
+        /// <summary>
+        /// True when this entity is an enemy of the other, per the alliance rules in
+        /// <see cref="Teams.TeamManager"/>. Falls back to "any different non-null team is
+        /// hostile" when no team manager is present.
+        /// </summary>
+        public bool IsHostileTo(Entity other)
+        {
+            if (other == null || team == null || other.team == null) return false;
+            var tm = Teams.TeamManager.Instance;
+            return tm != null ? tm.AreEnemies(team, other.team) : other.team != team;
+        }
 
         protected virtual void Awake()
         {

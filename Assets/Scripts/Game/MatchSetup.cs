@@ -20,11 +20,17 @@ namespace AditusBelli.Game
     {
         [Tooltip("Town Center building prefab (trains villagers, acts as a drop-off).")]
         public GameObject townCenterDef;
-        [Tooltip("Barracks building prefab: enemy teams start with one and train soldiers from it.")]
-        public GameObject barracksDef;
         [Tooltip("Villager prefab spawned next to each city center at game start.")]
         public GameObject villagerPrefab;
         [Min(0)] public int villagersPerTeam = 3;
+
+        [Header("Bot buildable prefabs (handed to each AI player)")]
+        public GameObject housePrefab;
+        public GameObject warehousePrefab;
+        public GameObject barracksPrefab;
+        public GameObject guardTowerPrefab;
+        public GameObject wallPrefab;
+        public GameObject dockPrefab;
 
         [Header("Resource sprites (by type)")]
         public Sprite woodSprite;
@@ -62,9 +68,9 @@ namespace AditusBelli.Game
             {
                 Vector2Int cc = layout.CityCenters[i];
                 TeamDef team = teams[i];
-                CreateBuilding(grid, cc, townCenterDef, team);
+                Building townCenter = CreateBuilding(grid, cc, townCenterDef, team);
                 SpawnVillagers(grid, cc, team, rng);
-                if (team != local) SetupEnemy(grid, cc, team); // give AI opponents a barracks + brain
+                if (team != local) SetupBot(team, townCenter); // give AI opponents a brain (they build the rest)
             }
 
             SpawnResources(grid, layout);
@@ -88,63 +94,25 @@ namespace AditusBelli.Game
             return building;
         }
 
-        private void SetupEnemy(GameGrid grid, Vector2Int ccOrigin, TeamDef team)
-        {
-            if (barracksDef == null) return;
-
-            var barracksBuilding = barracksDef.GetComponent<Building>();
-            if (barracksBuilding == null) return;
-
-            Vector2Int tcSize = TownCenterFootprint();
-            if (!TryFindBuildable(grid, ccOrigin, tcSize, barracksBuilding.footprint, out Vector2Int barracksOrigin))
-                return; // no room near the base; skip (the AI just won't have a barracks)
-
-            Building barracks = CreateBuilding(grid, barracksOrigin, barracksDef, team);
-
-            var aiGo = new GameObject($"EnemyAI ({team.displayName})");
-            aiGo.AddComponent<EnemyAI>().Init(team, barracks);
-        }
-
         /// <summary>
-        /// Finds a free origin near the town center where the given footprint fits on
-        /// walkable terrain and does not overlap the town-center footprint. Searches
-        /// outward ring by ring. (Buildings have not blocked their cells yet at setup.)
+        /// Attaches an AI brain to a bot team. The bot starts with only its town center
+        /// and villagers (like the human) and builds everything else itself, under its
+        /// own economy and fog of war.
         /// </summary>
-        private static bool TryFindBuildable(GameGrid grid, Vector2Int tcOrigin, Vector2Int tcSize,
-            Vector2Int size, out Vector2Int origin)
+        private void SetupBot(TeamDef team, Building townCenter)
         {
-            int fx = Mathf.Max(1, size.x);
-            int fy = Mathf.Max(1, size.y);
-            for (int r = 2; r <= 8; r++)
+            var aiGo = new GameObject($"BotPlayer ({team.displayName})");
+            aiGo.AddComponent<BotPlayer>().Init(team, townCenter, new BotPlayer.Loadout
             {
-                for (int dy = -r; dy <= r; dy++)
-                for (int dx = -r; dx <= r; dx++)
-                {
-                    if (Mathf.Abs(dx) != r && Mathf.Abs(dy) != r) continue; // ring outline only
-                    var o = new Vector2Int(tcOrigin.x + dx, tcOrigin.y + dy);
-                    if (FootprintWalkable(grid, o, fx, fy) &&
-                        !Overlaps(o, fx, fy, tcOrigin, tcSize.x, tcSize.y))
-                    {
-                        origin = o;
-                        return true;
-                    }
-                }
-            }
-            origin = tcOrigin;
-            return false;
+                townCenter = townCenterDef,
+                house = housePrefab,
+                warehouse = warehousePrefab,
+                barracks = barracksPrefab,
+                guardTower = guardTowerPrefab,
+                wall = wallPrefab,
+                dock = dockPrefab,
+            });
         }
-
-        private static bool FootprintWalkable(GameGrid grid, Vector2Int origin, int fx, int fy)
-        {
-            for (int dx = 0; dx < fx; dx++)
-            for (int dy = 0; dy < fy; dy++)
-                if (!grid.IsWalkable(new Vector2Int(origin.x + dx, origin.y + dy))) return false;
-            return true;
-        }
-
-        private static bool Overlaps(Vector2Int aOrigin, int aw, int ah, Vector2Int bOrigin, int bw, int bh) =>
-            aOrigin.x < bOrigin.x + bw && aOrigin.x + aw > bOrigin.x &&
-            aOrigin.y < bOrigin.y + bh && aOrigin.y + ah > bOrigin.y;
 
         private void SpawnVillagers(GameGrid grid, Vector2Int ccOrigin, TeamDef team, System.Random rng)
         {

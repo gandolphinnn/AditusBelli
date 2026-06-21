@@ -21,5 +21,10 @@ namespace AditusBelli.Teams
         [Header("Population")]
         [Tooltip("Population headroom before any buildings (houses add on top).")]
         public int basePopulation = 8;
+
+        [Header("Diplomacy")]
+        [Tooltip("Alliance group. 0 = unaligned (hostile to everyone but itself — free-for-all). " +
+                 "Teams sharing the same group > 0 are allies; everyone else is an enemy.")]
+        public int allianceGroup = 0;
     }
 }

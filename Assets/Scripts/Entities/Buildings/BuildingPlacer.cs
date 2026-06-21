@@ -100,14 +100,15 @@ namespace AditusBelli.Buildings
             Vector3Int c = grid.WorldToCell(world);
             var origin = new Vector2Int(c.x, c.y);
 
-            Vector2Int footprint = Footprint(_placing);
+            Vector2Int footprint = BuildPlacement.Footprint(_placing);
             var def = _placing.GetComponent<Building>();
             bool needsWater = def != null && def.requiresAdjacentWater;
-            bool valid = FootprintFree(grid, origin, footprint) && CanAfford(_placing) &&
-                         (!needsWater || HasAdjacentWater(grid, origin, footprint));
+            TeamEconomy econ = TeamManager.Instance != null ? TeamManager.Instance.LocalEconomy : null;
+            bool valid = BuildPlacement.FootprintFree(grid, origin, footprint) &&
+                         BuildPlacement.CanAfford(econ, _placing) &&
+                         (!needsWater || BuildPlacement.HasAdjacentWater(grid, origin, footprint));
 
-            Vector3 center = FootprintCenter(grid, origin, footprint);
-            center.z = 0f;
+            Vector3 center = BuildPlacement.FootprintCenter(grid, origin, footprint);
             _ghost.transform.position = center;
             _ghostSr.color = valid
                 ? new Color(0.4f, 1f, 0.5f, 0.5f)
@@ -116,7 +117,8 @@ namespace AditusBelli.Buildings
             // Ignore the click that pressed a Build button (it's over the HUD).
             if (mouse.leftButton.wasPressedThisFrame && valid && !HudController.IsPointerOverUi)
             {
-                PlaceAt(grid, origin, _placing);
+                TeamDef owner = TeamManager.Instance != null ? TeamManager.Instance.LocalPlayer : null;
+                BuildPlacement.PlaceConstructionSite(grid, _placing, origin, owner, econ);
                 _placing = null;
                 _awaitingRelease = true;            // keep IsActive until the click is released
                 if (_ghost != null) _ghost.SetActive(false);
@@ -150,67 +152,6 @@ namespace AditusBelli.Buildings
             if (kb.digit9Key.wasPressedThisFrame) return 8;
             if (kb.digit0Key.wasPressedThisFrame) return 9;
             return -1;
-        }
-
-        private void PlaceAt(GameGrid grid, Vector2Int origin, GameObject prefab)
-        {
-            var def = prefab.GetComponent<Building>();
-            TeamManager.Instance?.LocalEconomy?.TrySpend(ResourceType.Wood, def != null ? def.woodCost : 0);
-
-            Vector3 center = FootprintCenter(grid, origin, Footprint(prefab));
-            center.z = 0f;
-            GameObject go = Instantiate(prefab, center, Quaternion.identity);
-
-            var building = go.GetComponent<Building>();
-            if (building != null)
-            {
-                building.team = TeamManager.Instance != null ? TeamManager.Instance.LocalPlayer : null;
-                building.originCell = origin;
-                building.startCompleted = false; // construction site: villagers build it
-            }
-        }
-
-        private static Vector2Int Footprint(GameObject prefab)
-        {
-            var b = prefab != null ? prefab.GetComponent<Building>() : null;
-            return b != null ? b.footprint : new Vector2Int(1, 1);
-        }
-
-        private static bool CanAfford(GameObject prefab)
-        {
-            var b = prefab != null ? prefab.GetComponent<Building>() : null;
-            TeamEconomy econ = TeamManager.Instance != null ? TeamManager.Instance.LocalEconomy : null;
-            return econ == null || b == null || econ.Get(ResourceType.Wood) >= b.woodCost;
-        }
-
-        private static bool FootprintFree(GameGrid grid, Vector2Int origin, Vector2Int size)
-        {
-            for (int dx = 0; dx < Mathf.Max(1, size.x); dx++)
-            for (int dy = 0; dy < Mathf.Max(1, size.y); dy++)
-                if (!grid.IsWalkable(new Vector2Int(origin.x + dx, origin.y + dy))) return false;
-            return true;
-        }
-
-        /// <summary>True if any cell on the ring around the footprint is open water.</summary>
-        private static bool HasAdjacentWater(GameGrid grid, Vector2Int origin, Vector2Int size)
-        {
-            int fx = Mathf.Max(1, size.x), fy = Mathf.Max(1, size.y);
-            for (int dy = -1; dy <= fy; dy++)
-            for (int dx = -1; dx <= fx; dx++)
-            {
-                bool interior = dx >= 0 && dx < fx && dy >= 0 && dy < fy;
-                if (interior) continue;
-                if (grid.IsWalkable(new Vector2Int(origin.x + dx, origin.y + dy), true)) return true;
-            }
-            return false;
-        }
-
-        private static Vector3 FootprintCenter(GameGrid grid, Vector2Int origin, Vector2Int size)
-        {
-            Vector3 a = grid.CellCenter(origin);
-            Vector3 b = grid.CellCenter(new Vector2Int(origin.x + Mathf.Max(1, size.x) - 1,
-                                                       origin.y + Mathf.Max(1, size.y) - 1));
-            return (a + b) * 0.5f;
         }
 
         private void EnsureGhost()
