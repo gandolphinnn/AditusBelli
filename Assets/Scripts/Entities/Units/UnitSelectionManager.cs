@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using AditusBelli.Buildings;
 using AditusBelli.Combat;
 using AditusBelli.Economy;
+using AditusBelli.Entities;
 using AditusBelli.Teams;
 using AditusBelli.UI;
 using UnityEngine;
@@ -48,8 +49,7 @@ namespace AditusBelli.Units
             foreach (Unit u in AllUnitsList)
             {
                 if (u == null) continue;
-                var owner = u.GetComponent<Owner>();
-                if (owner != null && owner.Team == team) count++;
+                if (u.Team == team) count++;
             }
             return count;
         }
@@ -118,8 +118,7 @@ namespace AditusBelli.Units
         private static bool IsLocalPlayerUnit(Unit u)
         {
             if (u == null) return false;
-            var owner = u.GetComponent<Owner>();
-            return owner != null && TeamManager.Instance != null && owner.Team == TeamManager.Instance.LocalPlayer;
+            return TeamManager.Instance != null && u.Team == TeamManager.Instance.LocalPlayer;
         }
 
         private static bool IsMobile(Unit u)
@@ -131,10 +130,10 @@ namespace AditusBelli.Units
         // Only the player's own mobile units can be multi-selected (Shift / box).
         private static bool IsMultiSelectable(Unit u) => IsLocalPlayerUnit(u) && IsMobile(u);
 
-        private static bool IsEnemy(Health h)
+        private static bool IsEnemy(Entity e)
         {
-            var owner = h.GetComponent<Owner>();
-            return owner != null && TeamManager.Instance != null && owner.Team != TeamManager.Instance.LocalPlayer;
+            return e != null && e.Team != null && TeamManager.Instance != null &&
+                   e.Team != TeamManager.Instance.LocalPlayer;
         }
 
         private void HandleSingleClick(Vector2 screenPos)
@@ -208,7 +207,7 @@ namespace AditusBelli.Units
             Collider2D hit = Physics2D.OverlapPoint(world);
 
             // Right-clicking an enemy entity orders an attack.
-            Health enemy = hit != null ? hit.GetComponentInParent<Health>() : null;
+            Entity enemy = hit != null ? hit.GetComponentInParent<Entity>() : null;
             if (enemy != null && IsEnemy(enemy))
             {
                 foreach (Unit u in _selected)

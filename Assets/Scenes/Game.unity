@@ -119,7 +119,7 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
---- !u!1 &273336620
+--- !u!1 &194818891
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -127,128 +127,83 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 273336627}
-  - component: {fileID: 273336626}
-  - component: {fileID: 273336625}
-  - component: {fileID: 273336624}
-  - component: {fileID: 273336623}
-  - component: {fileID: 273336622}
-  - component: {fileID: 273336621}
+  - component: {fileID: 194818896}
+  - component: {fileID: 194818895}
+  - component: {fileID: 194818894}
+  - component: {fileID: 194818893}
+  - component: {fileID: 194818892}
   m_Layer: 0
-  m_Name: Game Systems
+  m_Name: Grid
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &273336621
+--- !u!114 &194818892
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 273336620}
+  m_GameObject: {fileID: 194818891}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: faa37d28f6f7f9741840fdf56e5b9cba, type: 3}
+  m_Script: {fileID: 11500000, guid: 4d70026e69be6cf4e9fa16f1fb493b63, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::AditusBelli.Game.MatchSetup
-  townCenterDef: {fileID: 6915742481709240700, guid: 8d6e3028d93683a4884f8223678b7a8c, type: 3}
-  barracksDef: {fileID: 5660619250774213830, guid: 754145b9e13ba7a408908893b0fa4f1f, type: 3}
-  villagerPrefab: {fileID: 1763843447032768059, guid: e60725ef5083c504ebda7ce1777cfc70, type: 3}
-  villagersPerTeam: 3
-  woodSprite: {fileID: 21300000, guid: 101ede36369f71840b50d7093fb04c17, type: 3}
-  foodSprite: {fileID: 21300000, guid: 79a45c6f309367743946254969de2f78, type: 3}
-  goldSprite: {fileID: 21300000, guid: 902bc2155bf9a414fa1dda27fe891e1d, type: 3}
-  stoneSprite: {fileID: 21300000, guid: 5056dc7b191b1cb409070d174c359e69, type: 3}
-  woodAmount: 100
-  foodAmount: 75
-  goldAmount: 150
-  stoneAmount: 150
---- !u!114 &273336622
+  m_EditorClassIdentifier: Assembly-CSharp::AditusBelli.Map.WorldMapGenerator
+  seed: -1038437759
+  randomizeSeed: 0
+  size: 1
+  resources: 2
+  playerCount: 2
+  worldType: 0
+--- !u!114 &194818893
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 273336620}
+  m_GameObject: {fileID: 194818891}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6959170fde948254cb859978919722dc, type: 3}
+  m_Script: {fileID: 11500000, guid: 1a510ec557b95934ba7896265a22c3bf, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::AditusBelli.Buildings.BuildingPlacer
-  buildable:
-  - {fileID: 5872309170212870818, guid: 79aa05f3639709441a60abe3c61350bb, type: 3}
-  - {fileID: 7669171834641851791, guid: 096267a6d0e570b4baccc69e5d5f30bd, type: 3}
-  - {fileID: 5660619250774213830, guid: 754145b9e13ba7a408908893b0fa4f1f, type: 3}
-  - {fileID: 7919140631644018501, guid: adfc7643651db8f4181eb911df1ebf5e, type: 3}
-  - {fileID: 4557458211446783486, guid: edf43d85b71b1984fa3ce357a3eb910a, type: 3}
-  - {fileID: 5045998153183954738, guid: 2871392f20a35e44eafdfffae52b95a9, type: 3}
---- !u!114 &273336623
+  m_EditorClassIdentifier: Assembly-CSharp::AditusBelli.Map.FogOfWar
+  unitVision: 6
+  buildingVision: 9
+  refreshInterval: 0.1
+--- !u!114 &194818894
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 273336620}
+  m_GameObject: {fileID: 194818891}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e0a9f33b50774b942ab93d278ef9f09d, type: 3}
+  m_Script: {fileID: 11500000, guid: 2d026d125dda3bc4da6ebcd118214392, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::AditusBelli.Game.MatchManager
-  graceTime: 1
-  checkInterval: 0.5
---- !u!114 &273336624
-MonoBehaviour:
+  m_EditorClassIdentifier: Assembly-CSharp::AditusBelli.Map.GameGrid
+  groundTilemap: {fileID: 0}
+--- !u!156049354 &194818895
+Grid:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 273336620}
+  m_GameObject: {fileID: 194818891}
   m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3a0c1092998de0148bb011d2af0307bc, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::AditusBelli.Teams.TeamManager
-  teams:
-  - {fileID: 11400000, guid: 066c7072f08f2b84e961353299a771cf, type: 2}
-  - {fileID: 11400000, guid: 20b15dc65b2f3564eb443d155aae66e6, type: 2}
-  localPlayer: {fileID: 11400000, guid: 066c7072f08f2b84e961353299a771cf, type: 2}
---- !u!114 &273336625
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 273336620}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 23c2547b5d0641947b7cb39aabc682ca, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::AditusBelli.UI.HudController
---- !u!114 &273336626
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 273336620}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 770d2c37fe3b327448261c8365b51b16, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::AditusBelli.Units.UnitSelectionManager
-  dragThreshold: 8
-  formationSpacing: 0.6
-  boxFill: {r: 0.3, g: 0.85, b: 0.45, a: 0.15}
-  boxBorder: {r: 0.4, g: 0.95, b: 0.55, a: 0.9}
---- !u!4 &273336627
+  m_CellSize: {x: 1, y: 0.5, z: 1}
+  m_CellGap: {x: 0, y: 0, z: 0}
+  m_CellLayout: 2
+  m_CellSwizzle: 0
+--- !u!4 &194818896
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 273336620}
+  m_GameObject: {fileID: 194818891}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -257,7 +212,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &322131449
+--- !u!1 &593116672
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -265,111 +220,10 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 322131451}
-  - component: {fileID: 322131450}
-  m_Layer: 0
-  m_Name: Global Light 2D
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &322131450
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 322131449}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 073797afb82c5a1438f328866b10b3f0, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.2D.Runtime::UnityEngine.Rendering.Universal.Light2D
-  m_ComponentVersion: 4
-  m_LightType: 4
-  m_BlendStyleIndex: 0
-  m_Light2DProvider:
-    rid: -2
-  m_SelectionSources:
-    rid: 3078304252435365964
-  m_FalloffIntensity: 0.5
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_Intensity: 1
-  m_LightVolumeIntensity: 1
-  m_LightVolumeEnabled: 0
-  m_ApplyToSortingLayers: 00000000
-  m_LightCookieSprite: {fileID: 0}
-  m_DeprecatedPointLightCookieSprite: {fileID: 0}
-  m_LightOrder: 0
-  m_AlphaBlendOnOverlap: 0
-  m_OverlapOperation: 0
-  m_NormalMapDistance: 3
-  m_NormalMapQuality: 2
-  m_UseNormalMap: 0
-  m_ShadowsEnabled: 1
-  m_ShadowIntensity: 0.75
-  m_ShadowSoftness: 0.3
-  m_ShadowSoftnessFalloffIntensity: 0.5
-  m_ShadowVolumeIntensityEnabled: 0
-  m_ShadowVolumeIntensity: 0.75
-  m_LocalBounds:
-    m_Center: {x: 0, y: 0, z: 0}
-    m_Extent: {x: 0, y: 0, z: 0}
-  m_PointLightInnerAngle: 360
-  m_PointLightOuterAngle: 360
-  m_PointLightInnerRadius: 0
-  m_PointLightOuterRadius: 1
-  m_ShapeLightParametricSides: 5
-  m_ShapeLightParametricAngleOffset: 0
-  m_ShapeLightParametricRadius: 1
-  m_ShapeLightFalloffSize: 0.5
-  m_ShapeLightFalloffOffset: {x: 0, y: 0}
-  m_ShapePath:
-  - {x: -0.5, y: -0.5, z: 0}
-  - {x: 0.5, y: -0.5, z: 0}
-  - {x: 0.5, y: 0.5, z: 0}
-  - {x: -0.5, y: 0.5, z: 0}
-  references:
-    version: 2
-    RefIds:
-    - rid: -2
-      type: {class: , ns: , asm: }
-    - rid: 3078304252435365964
-      type: {class: Light2DProviderSources, ns: UnityEngine.Rendering.Universal, asm: Unity.RenderPipelines.Universal.2D.Runtime}
-      data:
-        m_SelectedHashCode: 4
-        m_SelectedSource:
-          rid: -2
-        m_Provider2DCache:
-          rid: -2
---- !u!4 &322131451
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 322131449}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1814898190
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1814898194}
-  - component: {fileID: 1814898193}
-  - component: {fileID: 1814898192}
-  - component: {fileID: 1814898191}
+  - component: {fileID: 593116676}
+  - component: {fileID: 593116675}
+  - component: {fileID: 593116674}
+  - component: {fileID: 593116673}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -377,13 +231,13 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1814898191
+--- !u!114 &593116673
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1814898190}
+  m_GameObject: {fileID: 593116672}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c5765f2469b36734ba3009e7a7033c94, type: 3}
@@ -392,13 +246,13 @@ MonoBehaviour:
   zoomStep: 1
   minOrthoSize: 2
   maxOrthoSize: 40
---- !u!114 &1814898192
+--- !u!114 &593116674
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1814898190}
+  m_GameObject: {fileID: 593116672}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a79441f348de89743a2939f4d699eac1, type: 3}
@@ -436,13 +290,13 @@ MonoBehaviour:
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
   m_Version: 2
---- !u!20 &1814898193
+--- !u!20 &593116675
 Camera:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1814898190}
+  m_GameObject: {fileID: 593116672}
   m_Enabled: 1
   serializedVersion: 2
   m_ClearFlags: 2
@@ -487,13 +341,13 @@ Camera:
   m_OcclusionCulling: 1
   m_StereoConvergence: 10
   m_StereoSeparation: 0.022
---- !u!4 &1814898194
+--- !u!4 &593116676
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1814898190}
+  m_GameObject: {fileID: 593116672}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: -10}
@@ -502,7 +356,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1907280418
+--- !u!1 &712330201
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -510,83 +364,229 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1907280423}
-  - component: {fileID: 1907280422}
-  - component: {fileID: 1907280421}
-  - component: {fileID: 1907280420}
-  - component: {fileID: 1907280419}
+  - component: {fileID: 712330203}
+  - component: {fileID: 712330202}
   m_Layer: 0
-  m_Name: Grid
+  m_Name: Global Light 2D
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1907280419
+--- !u!114 &712330202
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1907280418}
+  m_GameObject: {fileID: 712330201}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4d70026e69be6cf4e9fa16f1fb493b63, type: 3}
+  m_Script: {fileID: 11500000, guid: 073797afb82c5a1438f328866b10b3f0, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::AditusBelli.Map.WorldMapGenerator
-  seed: -1038437759
-  randomizeSeed: 0
-  size: 1
-  resources: 2
-  playerCount: 2
-  worldType: 0
---- !u!114 &1907280420
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1907280418}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 1a510ec557b95934ba7896265a22c3bf, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::AditusBelli.Map.FogOfWar
-  unitVision: 6
-  buildingVision: 9
-  refreshInterval: 0.1
---- !u!114 &1907280421
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1907280418}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2d026d125dda3bc4da6ebcd118214392, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::AditusBelli.Map.GameGrid
-  groundTilemap: {fileID: 0}
---- !u!156049354 &1907280422
-Grid:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1907280418}
-  m_Enabled: 1
-  m_CellSize: {x: 1, y: 0.5, z: 1}
-  m_CellGap: {x: 0, y: 0, z: 0}
-  m_CellLayout: 2
-  m_CellSwizzle: 0
---- !u!4 &1907280423
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.2D.Runtime::UnityEngine.Rendering.Universal.Light2D
+  m_ComponentVersion: 4
+  m_LightType: 4
+  m_BlendStyleIndex: 0
+  m_Light2DProvider:
+    rid: -2
+  m_SelectionSources:
+    rid: 3078304292359110728
+  m_FalloffIntensity: 0.5
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Intensity: 1
+  m_LightVolumeIntensity: 1
+  m_LightVolumeEnabled: 0
+  m_ApplyToSortingLayers: 00000000
+  m_LightCookieSprite: {fileID: 0}
+  m_DeprecatedPointLightCookieSprite: {fileID: 0}
+  m_LightOrder: 0
+  m_AlphaBlendOnOverlap: 0
+  m_OverlapOperation: 0
+  m_NormalMapDistance: 3
+  m_NormalMapQuality: 2
+  m_UseNormalMap: 0
+  m_ShadowsEnabled: 1
+  m_ShadowIntensity: 0.75
+  m_ShadowSoftness: 0.3
+  m_ShadowSoftnessFalloffIntensity: 0.5
+  m_ShadowVolumeIntensityEnabled: 0
+  m_ShadowVolumeIntensity: 0.75
+  m_LocalBounds:
+    m_Center: {x: 0, y: 0, z: 0}
+    m_Extent: {x: 0, y: 0, z: 0}
+  m_PointLightInnerAngle: 360
+  m_PointLightOuterAngle: 360
+  m_PointLightInnerRadius: 0
+  m_PointLightOuterRadius: 1
+  m_ShapeLightParametricSides: 5
+  m_ShapeLightParametricAngleOffset: 0
+  m_ShapeLightParametricRadius: 1
+  m_ShapeLightFalloffSize: 0.5
+  m_ShapeLightFalloffOffset: {x: 0, y: 0}
+  m_ShapePath:
+  - {x: -0.5, y: -0.5, z: 0}
+  - {x: 0.5, y: -0.5, z: 0}
+  - {x: 0.5, y: 0.5, z: 0}
+  - {x: -0.5, y: 0.5, z: 0}
+  references:
+    version: 2
+    RefIds:
+    - rid: -2
+      type: {class: , ns: , asm: }
+    - rid: 3078304292359110728
+      type: {class: Light2DProviderSources, ns: UnityEngine.Rendering.Universal, asm: Unity.RenderPipelines.Universal.2D.Runtime}
+      data:
+        m_SelectedHashCode: 4
+        m_SelectedSource:
+          rid: -2
+        m_Provider2DCache:
+          rid: -2
+--- !u!4 &712330203
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1907280418}
+  m_GameObject: {fileID: 712330201}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &2048256869
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2048256876}
+  - component: {fileID: 2048256875}
+  - component: {fileID: 2048256874}
+  - component: {fileID: 2048256873}
+  - component: {fileID: 2048256872}
+  - component: {fileID: 2048256871}
+  - component: {fileID: 2048256870}
+  m_Layer: 0
+  m_Name: Game Systems
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &2048256870
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2048256869}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: faa37d28f6f7f9741840fdf56e5b9cba, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AditusBelli.Game.MatchSetup
+  townCenterDef: {fileID: 6915742481709240700, guid: 8d6e3028d93683a4884f8223678b7a8c, type: 3}
+  barracksDef: {fileID: 5660619250774213830, guid: 754145b9e13ba7a408908893b0fa4f1f, type: 3}
+  villagerPrefab: {fileID: 1763843447032768059, guid: e60725ef5083c504ebda7ce1777cfc70, type: 3}
+  villagersPerTeam: 3
+  woodSprite: {fileID: 21300000, guid: 101ede36369f71840b50d7093fb04c17, type: 3}
+  foodSprite: {fileID: 21300000, guid: 79a45c6f309367743946254969de2f78, type: 3}
+  goldSprite: {fileID: 21300000, guid: 902bc2155bf9a414fa1dda27fe891e1d, type: 3}
+  stoneSprite: {fileID: 21300000, guid: 5056dc7b191b1cb409070d174c359e69, type: 3}
+  woodAmount: 100
+  foodAmount: 75
+  goldAmount: 150
+  stoneAmount: 150
+--- !u!114 &2048256871
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2048256869}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6959170fde948254cb859978919722dc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AditusBelli.Buildings.BuildingPlacer
+  buildable:
+  - {fileID: 5872309170212870818, guid: 79aa05f3639709441a60abe3c61350bb, type: 3}
+  - {fileID: 7669171834641851791, guid: 096267a6d0e570b4baccc69e5d5f30bd, type: 3}
+  - {fileID: 5660619250774213830, guid: 754145b9e13ba7a408908893b0fa4f1f, type: 3}
+  - {fileID: 7919140631644018501, guid: adfc7643651db8f4181eb911df1ebf5e, type: 3}
+  - {fileID: 4557458211446783486, guid: edf43d85b71b1984fa3ce357a3eb910a, type: 3}
+  - {fileID: 5045998153183954738, guid: 2871392f20a35e44eafdfffae52b95a9, type: 3}
+--- !u!114 &2048256872
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2048256869}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e0a9f33b50774b942ab93d278ef9f09d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AditusBelli.Game.MatchManager
+  graceTime: 1
+  checkInterval: 0.5
+--- !u!114 &2048256873
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2048256869}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3a0c1092998de0148bb011d2af0307bc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AditusBelli.Teams.TeamManager
+  teams:
+  - {fileID: 11400000, guid: 066c7072f08f2b84e961353299a771cf, type: 2}
+  - {fileID: 11400000, guid: 20b15dc65b2f3564eb443d155aae66e6, type: 2}
+  localPlayer: {fileID: 11400000, guid: 066c7072f08f2b84e961353299a771cf, type: 2}
+--- !u!114 &2048256874
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2048256869}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 23c2547b5d0641947b7cb39aabc682ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AditusBelli.UI.HudController
+--- !u!114 &2048256875
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2048256869}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 770d2c37fe3b327448261c8365b51b16, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AditusBelli.Units.UnitSelectionManager
+  dragThreshold: 8
+  formationSpacing: 0.6
+  boxFill: {r: 0.3, g: 0.85, b: 0.45, a: 0.15}
+  boxBorder: {r: 0.4, g: 0.95, b: 0.55, a: 0.9}
+--- !u!4 &2048256876
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2048256869}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -599,7 +599,7 @@ Transform:
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
-  - {fileID: 1814898194}
-  - {fileID: 322131451}
-  - {fileID: 1907280423}
-  - {fileID: 273336627}
+  - {fileID: 593116676}
+  - {fileID: 712330203}
+  - {fileID: 194818896}
+  - {fileID: 2048256876}

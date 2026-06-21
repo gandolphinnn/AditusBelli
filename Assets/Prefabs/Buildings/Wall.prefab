@@ -11,8 +11,6 @@ GameObject:
   - component: {fileID: 404452538012193319}
   - component: {fileID: 397070688748943347}
   - component: {fileID: 7736188927542016113}
-  - component: {fileID: 9046736879943053615}
-  - component: {fileID: 3534272494553580667}
   - component: {fileID: 6873774473871980733}
   m_Layer: 0
   m_Name: Wall
@@ -132,33 +130,6 @@ CircleCollider2D:
   m_CompositeOrder: 0
   m_Offset: {x: 0, y: 0}
   m_Radius: 0.4
---- !u!114 &9046736879943053615
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4557458211446783486}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: bf7e647872cbad64f822f8d1bf63e451, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::AditusBelli.Teams.Owner
-  team: {fileID: 0}
-  applyTeamColor: 0
---- !u!114 &3534272494553580667
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4557458211446783486}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 50cd9cdfbf9bbaa40abe7215e7ea9bf7, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::AditusBelli.Combat.Health
-  maxHealth: 600
 --- !u!114 &6873774473871980733
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -171,6 +142,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2ad2d28b84672cf4faa8d8a13fad04a5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AditusBelli.Buildings.Building
+  team: {fileID: 0}
+  applyTeamColor: 0
+  maxHealth: 600
   displayName: Wall
   footprint: {x: 1, y: 1}
   woodCost: 5

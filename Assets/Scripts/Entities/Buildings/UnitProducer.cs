@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using AditusBelli.Economy;
+using AditusBelli.Entities;
 using AditusBelli.Map;
 using AditusBelli.Teams;
 using AditusBelli.Units;
@@ -33,8 +34,7 @@ namespace AditusBelli.Buildings
         private void Awake()
         {
             _building = GetComponent<Building>();
-            var owner = GetComponent<Owner>();
-            _ownerTeam = owner != null ? owner.Team : null;
+            _ownerTeam = _building != null ? _building.Team : null;
         }
 
         public void SetRallyPoint(Vector3 worldPos)
@@ -111,8 +111,8 @@ namespace AditusBelli.Buildings
             Vector3 spawn = ComputeSpawnPoint(prefab);
             GameObject go = Instantiate(prefab, spawn, Quaternion.identity);
 
-            var spawnedOwner = go.GetComponent<Owner>();
-            if (spawnedOwner != null && _ownerTeam != null) spawnedOwner.team = _ownerTeam;
+            var spawnedEntity = go.GetComponent<Entity>();
+            if (spawnedEntity != null && _ownerTeam != null) spawnedEntity.team = _ownerTeam;
 
             if (_hasRally)
             {

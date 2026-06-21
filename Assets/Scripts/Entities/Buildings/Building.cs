@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using AditusBelli.Economy;
+using AditusBelli.Entities;
 using AditusBelli.Map;
 using AditusBelli.Teams;
 using UnityEngine;
@@ -11,10 +12,10 @@ namespace AditusBelli.Buildings
     /// on the prefab — there is no separate BuildingDef asset. Starts as a
     /// construction site (semi-transparent) and becomes functional once villagers
     /// finish the work; blocks its footprint cells, contributes population to its
-    /// owner's economy and acts as a drop-off when complete.
+    /// owner's economy and acts as a drop-off when complete. Inherits ownership and
+    /// hit points from <see cref="Entity"/>.
     /// </summary>
-    [RequireComponent(typeof(SpriteRenderer))]
-    public class Building : MonoBehaviour
+    public class Building : Entity
     {
         [Header("Definition")]
         public string displayName = "Building";
@@ -33,9 +34,9 @@ namespace AditusBelli.Buildings
         public Vector2Int originCell;
         public bool startCompleted;
 
-        public static readonly List<Building> All = new();
+        /// <summary>All live buildings (a buildings-only view; <see cref="Entity.All"/> has every entity).</summary>
+        public static readonly List<Building> AllBuildings = new();
 
-        private SpriteRenderer _sr;
         private float _progress;
         private bool _complete;
         private bool _blocked;
@@ -45,13 +46,21 @@ namespace AditusBelli.Buildings
         public bool IsComplete => _complete;
         public float Progress => _progress;
 
-        private void Awake() => _sr = GetComponent<SpriteRenderer>();
-
-        private void OnEnable() => All.Add(this);
-        private void OnDisable() => All.Remove(this);
-
-        private void Start()
+        protected override void OnEnable()
         {
+            base.OnEnable();
+            AllBuildings.Add(this);
+        }
+
+        protected override void OnDisable()
+        {
+            base.OnDisable();
+            AllBuildings.Remove(this);
+        }
+
+        protected override void Start()
+        {
+            base.Start();
             BlockFootprint(true);
             if (startCompleted) CompleteInternal();
             else UpdateVisual();
@@ -77,9 +86,7 @@ namespace AditusBelli.Buildings
 
             if (!_capContributed && populationProvided != 0)
             {
-                var owner = GetComponent<Owner>();
-                _capEconomy = (owner != null && TeamManager.Instance != null)
-                    ? TeamManager.Instance.EconomyFor(owner.Team) : null;
+                _capEconomy = TeamManager.Instance != null ? TeamManager.Instance.EconomyFor(Team) : null;
                 if (_capEconomy != null)
                 {
                     _capEconomy.AddCap(populationProvided);
@@ -96,10 +103,10 @@ namespace AditusBelli.Buildings
 
         private void UpdateVisual()
         {
-            if (_sr == null) return;
-            Color c = _sr.color;
+            if (Sr == null) return;
+            Color c = Sr.color;
             c.a = _complete ? 1f : Mathf.Lerp(0.35f, 0.85f, _progress);
-            _sr.color = c;
+            Sr.color = c;
         }
 
         private void BlockFootprint(bool blocked)
@@ -114,8 +121,9 @@ namespace AditusBelli.Buildings
             _blocked = blocked;
         }
 
-        private void OnDestroy()
+        protected override void OnDestroy()
         {
+            base.OnDestroy();
             if (_capContributed && _capEconomy != null)
                 _capEconomy.RemoveCap(populationProvided);
             if (_blocked) BlockFootprint(false);

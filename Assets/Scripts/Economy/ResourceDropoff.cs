@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using AditusBelli.Entities;
 using AditusBelli.Teams;
 using UnityEngine;
 
@@ -26,8 +27,8 @@ namespace AditusBelli.Economy
                 if (d == null) continue;
                 if (team != null)
                 {
-                    var owner = d.GetComponent<Owner>();
-                    if (owner == null || owner.Team != team) continue;
+                    var entity = d.GetComponent<Entity>();
+                    if (entity == null || entity.Team != team) continue;
                 }
                 float sq = (d.transform.position - position).sqrMagnitude;
                 if (sq < bestSq) { bestSq = sq; best = d; }

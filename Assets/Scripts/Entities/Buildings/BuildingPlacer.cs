@@ -161,12 +161,10 @@ namespace AditusBelli.Buildings
             center.z = 0f;
             GameObject go = Instantiate(prefab, center, Quaternion.identity);
 
-            var owner = go.GetComponent<Owner>();
-            if (owner != null) owner.team = TeamManager.Instance != null ? TeamManager.Instance.LocalPlayer : null;
-
             var building = go.GetComponent<Building>();
             if (building != null)
             {
+                building.team = TeamManager.Instance != null ? TeamManager.Instance.LocalPlayer : null;
                 building.originCell = origin;
                 building.startCompleted = false; // construction site: villagers build it
             }

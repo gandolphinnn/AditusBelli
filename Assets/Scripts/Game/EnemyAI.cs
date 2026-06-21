@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using AditusBelli.Buildings;
 using AditusBelli.Combat;
 using AditusBelli.Economy;
+using AditusBelli.Entities;
 using AditusBelli.Teams;
 using AditusBelli.Units;
 using UnityEngine;
@@ -89,9 +90,7 @@ namespace AditusBelli.Game
             _villagers.Clear();
             foreach (Unit u in UnitSelectionManager.AllUnits)
             {
-                if (u == null) continue;
-                var owner = u.GetComponent<Owner>();
-                if (owner == null || owner.Team != _team) continue;
+                if (u == null || u.Team != _team) continue;
 
                 var combatant = u.GetComponent<Combatant>();
                 if (combatant != null) { _soldiers.Add(combatant); continue; }
@@ -143,7 +142,7 @@ namespace AditusBelli.Game
             foreach (Combatant c in _attackers)
             {
                 if (c == null || c.HasTarget) continue;
-                Health target = NearestHostileBuilding(c.transform.position)
+                Entity target = NearestHostileBuilding(c.transform.position)
                                 ?? NearestHostileUnit(c.transform.position);
                 if (target != null) c.AttackTarget(target);
             }
@@ -165,36 +164,30 @@ namespace AditusBelli.Game
             return best;
         }
 
-        private Health NearestHostileBuilding(Vector3 from)
+        private Entity NearestHostileBuilding(Vector3 from)
         {
-            Health best = null;
+            Entity best = null;
             float bestSq = float.MaxValue;
-            foreach (Building b in Building.All)
+            foreach (Building b in Building.AllBuildings)
             {
-                if (b == null) continue;
-                var owner = b.GetComponent<Owner>();
-                if (owner == null || owner.Team == null || owner.Team == _team) continue; // neutral or own
-                var h = b.GetComponent<Health>();
-                if (h == null || !h.IsAlive) continue;
+                if (b == null || b.Team == null || b.Team == _team) continue; // neutral or own
+                if (!b.IsAlive) continue;
                 float sq = (b.transform.position - from).sqrMagnitude;
-                if (sq < bestSq) { bestSq = sq; best = h; }
+                if (sq < bestSq) { bestSq = sq; best = b; }
             }
             return best;
         }
 
-        private Health NearestHostileUnit(Vector3 from)
+        private Entity NearestHostileUnit(Vector3 from)
         {
-            Health best = null;
+            Entity best = null;
             float bestSq = float.MaxValue;
             foreach (Unit u in UnitSelectionManager.AllUnits)
             {
-                if (u == null) continue;
-                var owner = u.GetComponent<Owner>();
-                if (owner == null || owner.Team == null || owner.Team == _team) continue;
-                var h = u.GetComponent<Health>();
-                if (h == null || !h.IsAlive) continue;
+                if (u == null || u.Team == null || u.Team == _team) continue;
+                if (!u.IsAlive) continue;
                 float sq = (u.transform.position - from).sqrMagnitude;
-                if (sq < bestSq) { bestSq = sq; best = h; }
+                if (sq < bestSq) { bestSq = sq; best = u; }
             }
             return best;
         }

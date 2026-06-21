@@ -43,12 +43,10 @@ namespace AditusBelli.Game
 
             int playerBuildings = 0;
             int enemyBuildings = 0;
-            foreach (Building b in Building.All)
+            foreach (Building b in Building.AllBuildings)
             {
-                if (b == null) continue;
-                var owner = b.GetComponent<Owner>();
-                if (owner == null || owner.Team == null) continue; // neutral (e.g. walls)
-                if (owner.Team == local) playerBuildings++;
+                if (b == null || b.Team == null) continue; // neutral (e.g. walls)
+                if (b.Team == local) playerBuildings++;
                 else enemyBuildings++;
             }
 

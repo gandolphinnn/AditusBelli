@@ -1,6 +1,7 @@
 using AditusBelli.Buildings;
 using AditusBelli.CameraControl;
 using AditusBelli.Economy;
+using AditusBelli.Entities;
 using AditusBelli.Map;
 using AditusBelli.Teams;
 using AditusBelli.Units;
@@ -94,7 +95,7 @@ namespace AditusBelli.UI
                 if (u != null && BlipVisible(fog, useFog, u.gameObject))
                     Plot(u.transform.position, 1, BlipColor(u.gameObject));
 
-            foreach (Building b in Building.All)
+            foreach (Building b in Building.AllBuildings)
                 if (b != null && BlipVisible(fog, useFog, b.gameObject))
                     Plot(b.transform.position, 2, BlipColor(b.gameObject));
 
@@ -130,12 +131,12 @@ namespace AditusBelli.UI
         {
             if (!useFog) return true;
 
-            var owner = go.GetComponent<Owner>();
-            bool hasTeam = owner != null && owner.Team != null;
-            if (hasTeam && owner.Team == _localTeam) return true;
+            var entity = go.GetComponent<Entity>();
+            bool hasTeam = entity != null && entity.Team != null;
+            if (hasTeam && entity.Team == _localTeam) return true;
 
             Visibility v = fog.VisibilityAtWorld(go.transform.position);
-            bool enemy = hasTeam && owner.Team != _localTeam;
+            bool enemy = hasTeam && entity.Team != _localTeam;
             return enemy ? v == Visibility.Visible : v != Visibility.Unseen;
         }
 
@@ -193,8 +194,8 @@ namespace AditusBelli.UI
 
         private static Color32 BlipColor(GameObject go)
         {
-            var owner = go.GetComponent<Owner>();
-            return owner != null && owner.Team != null ? (Color32)owner.Team.color : Neutral;
+            var entity = go.GetComponent<Entity>();
+            return entity != null && entity.Team != null ? (Color32)entity.Team.color : Neutral;
         }
 
         private static Color32 ResourceColor(ResourceType type) => type switch

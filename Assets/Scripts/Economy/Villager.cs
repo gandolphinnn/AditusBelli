@@ -1,4 +1,5 @@
 using AditusBelli.Buildings;
+using AditusBelli.Entities;
 using AditusBelli.Map;
 using AditusBelli.Teams;
 using AditusBelli.Units;
@@ -22,7 +23,7 @@ namespace AditusBelli.Economy
         private enum State { Idle, ToResource, Gathering, ToDropoff, ToBuild, Building }
 
         private Unit _unit;
-        private Owner _owner;
+        private Entity _owner;
         private State _state = State.Idle;
         private ResourceNode _node;
         private Building _buildTarget;
@@ -41,7 +42,7 @@ namespace AditusBelli.Economy
         private void Awake()
         {
             _unit = GetComponent<Unit>();
-            _owner = GetComponent<Owner>();
+            _owner = GetComponent<Entity>();
             _lastNodePosition = transform.position;
         }
 

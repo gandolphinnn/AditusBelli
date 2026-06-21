@@ -3,7 +3,7 @@ using System.Text;
 using AditusBelli.Buildings;
 using AditusBelli.Combat;
 using AditusBelli.Economy;
-using AditusBelli.Teams;
+using AditusBelli.Entities;
 using AditusBelli.Units;
 using UnityEngine;
 using UnityEngine.UI;
@@ -56,23 +56,23 @@ namespace AditusBelli.UI
             _panel.gameObject.SetActive(true);
             _info.text = text;
 
-            Health h = PrimaryHealth(sm);
-            bool showHp = h != null && h.Max > 0;
+            Entity e = PrimaryEntity(sm);
+            bool showHp = e != null && e.Max > 0;
             _hpBack.gameObject.SetActive(showHp);
             if (showHp)
             {
-                UiFactory.SetBar(_hpFill, h.Current / (float)h.Max);
-                _hpText.text = $"HP {h.Current}/{h.Max}";
+                UiFactory.SetBar(_hpFill, e.Current / (float)e.Max);
+                _hpText.text = $"HP {e.Current}/{e.Max}";
             }
         }
 
-        /// <summary>The Health whose bar should be shown (single entity only).</summary>
-        private static Health PrimaryHealth(UnitSelectionManager sm)
+        /// <summary>The entity whose HP bar should be shown (single entity only).</summary>
+        private static Entity PrimaryEntity(UnitSelectionManager sm)
         {
-            if (sm.Selected.Count == 1) return sm.Selected[0] != null ? sm.Selected[0].GetComponent<Health>() : null;
+            if (sm.Selected.Count == 1) return sm.Selected[0];
             if (sm.Selected.Count >= 2) return null;
-            if (sm.SelectedBuilding != null) return sm.SelectedBuilding.GetComponent<Health>();
-            if (sm.SelectedUnit != null) return sm.SelectedUnit.GetComponent<Health>();
+            if (sm.SelectedBuilding != null) return sm.SelectedBuilding;
+            if (sm.SelectedUnit != null) return sm.SelectedUnit;
             return null;
         }
 
@@ -102,7 +102,7 @@ namespace AditusBelli.UI
             string name = combatant != null ? "Soldier" : (villager != null ? "Villager" : "Unit");
 
             var info = new StringBuilder("<b>").Append(name).Append("</b>");
-            AppendTeam(info, u.GetComponent<Owner>());
+            AppendTeam(info, u);
 
             if (villager != null)
                 info.Append(villager.CarriedAmount > 0
@@ -115,7 +115,7 @@ namespace AditusBelli.UI
         private static string BuildingInfo(Building b)
         {
             var info = new StringBuilder("<b>").Append(b.displayName).Append("</b>");
-            AppendTeam(info, b.GetComponent<Owner>());
+            AppendTeam(info, b);
 
             if (!b.IsComplete)
             {
@@ -147,9 +147,9 @@ namespace AditusBelli.UI
             return sb.ToString();
         }
 
-        private static void AppendTeam(StringBuilder sb, Owner owner)
+        private static void AppendTeam(StringBuilder sb, Entity entity)
         {
-            if (owner != null && owner.Team != null) sb.Append($"  ({owner.Team.displayName})");
+            if (entity != null && entity.Team != null) sb.Append($"  ({entity.Team.displayName})");
         }
 
         private static string CarriedSummary(int[] totals)

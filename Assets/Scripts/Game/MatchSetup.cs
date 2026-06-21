@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using AditusBelli.Buildings;
 using AditusBelli.Economy;
+using AditusBelli.Entities;
 using AditusBelli.Map;
 using AditusBelli.Teams;
 using UnityEngine;
@@ -80,10 +81,8 @@ namespace AditusBelli.Game
             Vector3 pos = FootprintCenter(grid, origin, fx, fy);
             GameObject go = Instantiate(prefab, pos, Quaternion.identity);
 
-            var owner = go.GetComponent<Owner>();
-            if (owner != null) owner.team = team;
-
             var building = go.GetComponent<Building>();
+            building.team = team;
             building.originCell = origin;
             building.startCompleted = true;
             return building;
@@ -174,8 +173,8 @@ namespace AditusBelli.Game
                 Vector3 pos = grid.CellCenter(candidates[i]);
                 pos.z = 0f;
                 GameObject go = Instantiate(villagerPrefab, pos, Quaternion.identity);
-                var owner = go.GetComponent<Owner>();
-                if (owner != null) owner.team = team; // set before Owner.Start tints it
+                var entity = go.GetComponent<Entity>();
+                if (entity != null) entity.team = team; // set before Entity.Start tints it
             }
         }
 

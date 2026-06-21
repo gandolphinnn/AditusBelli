@@ -1,16 +1,17 @@
 using System.Collections.Generic;
+using AditusBelli.Entities;
 using AditusBelli.Map;
 using UnityEngine;
 
 namespace AditusBelli.Units
 {
     /// <summary>
-    /// Selectable, movable unit. Movement follows a grid path computed by the
+    /// Selectable, movable entity. Movement follows a grid path computed by the
     /// <see cref="GameGrid"/>; if no grid/path is available it falls back to a
-    /// straight line toward the goal.
+    /// straight line toward the goal. Inherits ownership and hit points from
+    /// <see cref="Entity"/>.
     /// </summary>
-    [RequireComponent(typeof(SpriteRenderer))]
-    public class Unit : MonoBehaviour
+    public class Unit : Entity
     {
         [Header("Movement")]
         public float moveSpeed = 3f;
@@ -29,10 +30,23 @@ namespace AditusBelli.Units
         public bool IsSelected { get; private set; }
         public bool IsMoving => _hasTarget;
 
-        private void Awake() => SetSelected(false);
+        protected override void Awake()
+        {
+            base.Awake();
+            SetSelected(false);
+        }
 
-        private void OnEnable() => UnitSelectionManager.Register(this);
-        private void OnDisable() => UnitSelectionManager.Unregister(this);
+        protected override void OnEnable()
+        {
+            base.OnEnable();
+            UnitSelectionManager.Register(this);
+        }
+
+        protected override void OnDisable()
+        {
+            base.OnDisable();
+            UnitSelectionManager.Unregister(this);
+        }
 
         public void SetSelected(bool value)
         {

@@ -1,4 +1,4 @@
-using AditusBelli.Teams;
+using AditusBelli.Entities;
 using AditusBelli.Units;
 using UnityEngine;
 
@@ -24,8 +24,8 @@ namespace AditusBelli.Combat
         public float guardRadius = 0f;
 
         private Unit _unit;
-        private Owner _owner;
-        private Health _target;
+        private Entity _owner;
+        private Entity _target;
         private float _cooldown;
         private float _scanTimer;
         private Vector3 _home;
@@ -33,7 +33,7 @@ namespace AditusBelli.Combat
         private void Awake()
         {
             _unit = GetComponent<Unit>();
-            _owner = GetComponent<Owner>();
+            _owner = GetComponent<Entity>();
         }
 
         private void Start() => _home = transform.position;
@@ -41,7 +41,7 @@ namespace AditusBelli.Combat
         /// <summary>True while locked onto a live target.</summary>
         public bool HasTarget => _target != null && _target.IsAlive;
 
-        public void AttackTarget(Health target)
+        public void AttackTarget(Entity target)
         {
             if (target != null) _target = target;
         }
@@ -100,14 +100,12 @@ namespace AditusBelli.Combat
             // whatever is already within melee range.
             float range = mobile ? aggroRange : attackRange;
 
-            Health best = null;
+            Entity best = null;
             float bestSq = range * range;
-            foreach (Health h in Health.All)
+            foreach (Entity h in Entity.All)
             {
                 if (h == null || !h.IsAlive || h.gameObject == gameObject) continue;
-
-                var otherOwner = h.GetComponent<Owner>();
-                if (otherOwner == null || !_owner.IsHostileTo(otherOwner)) continue;
+                if (!_owner.IsHostileTo(h)) continue;
                 if (BeyondLeash(h.transform.position)) continue; // guards ignore enemies outside their leash
 
                 float sq = ((Vector2)(h.transform.position - transform.position)).sqrMagnitude;

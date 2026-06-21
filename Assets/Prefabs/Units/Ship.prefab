@@ -104,8 +104,6 @@ GameObject:
   - component: {fileID: 622463624627331968}
   - component: {fileID: 3211946937016653532}
   - component: {fileID: 2991031532579155527}
-  - component: {fileID: 6808322735211021969}
-  - component: {fileID: 2268492242992117075}
   - component: {fileID: 3580298390934065728}
   m_Layer: 0
   m_Name: Ship
@@ -238,37 +236,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d23c3e64574e81846865743345cd57bf, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AditusBelli.Units.Unit
+  team: {fileID: 11400000, guid: 066c7072f08f2b84e961353299a771cf, type: 2}
+  applyTeamColor: 1
+  maxHealth: 60
   moveSpeed: 3
   arriveThreshold: 0.05
   naval: 1
   selectionIndicator: {fileID: 4400889636114420984}
---- !u!114 &6808322735211021969
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8247400669982767728}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: bf7e647872cbad64f822f8d1bf63e451, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::AditusBelli.Teams.Owner
-  team: {fileID: 11400000, guid: 066c7072f08f2b84e961353299a771cf, type: 2}
-  applyTeamColor: 1
---- !u!114 &2268492242992117075
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8247400669982767728}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 50cd9cdfbf9bbaa40abe7215e7ea9bf7, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::AditusBelli.Combat.Health
-  maxHealth: 60
 --- !u!114 &3580298390934065728
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using AditusBelli.Buildings;
+using AditusBelli.Entities;
 using AditusBelli.Teams;
 using AditusBelli.Units;
 using UnityEngine;
@@ -182,12 +183,12 @@ namespace AditusBelli.Map
         {
             foreach (Unit u in UnitSelectionManager.AllUnits)
             {
-                if (u == null || !IsLocal(u.GetComponent<Owner>())) continue;
+                if (u == null || !IsLocal(u)) continue;
                 RevealAround(u.transform.position, unitVision);
             }
-            foreach (Building b in Building.All)
+            foreach (Building b in Building.AllBuildings)
             {
-                if (b == null || !IsLocal(b.GetComponent<Owner>())) continue;
+                if (b == null || !IsLocal(b)) continue;
                 RevealAround(b.transform.position, buildingVision);
             }
         }
@@ -217,10 +218,10 @@ namespace AditusBelli.Map
         private void HideEnemies()
         {
             foreach (Unit u in UnitSelectionManager.AllUnits)
-                if (u != null && IsEnemy(u.GetComponent<Owner>())) ApplyVisibility(u.gameObject);
+                if (u != null && IsEnemy(u)) ApplyVisibility(u.gameObject);
 
-            foreach (Building b in Building.All)
-                if (b != null && IsEnemy(b.GetComponent<Owner>())) ApplyVisibility(b.gameObject);
+            foreach (Building b in Building.AllBuildings)
+                if (b != null && IsEnemy(b)) ApplyVisibility(b.gameObject);
         }
 
         private void ApplyVisibility(GameObject go)
@@ -268,9 +269,9 @@ namespace AditusBelli.Map
 
         // -------------------------------------------------------------- helpers
 
-        private bool IsLocal(Owner owner) => owner != null && owner.Team != null && owner.Team == _localTeam;
+        private bool IsLocal(Entity e) => e != null && e.Team != null && e.Team == _localTeam;
 
-        private bool IsEnemy(Owner owner) => owner != null && owner.Team != null && owner.Team != _localTeam;
+        private bool IsEnemy(Entity e) => e != null && e.Team != null && e.Team != _localTeam;
 
         private static Color ColorFor(Visibility s) => s switch
         {

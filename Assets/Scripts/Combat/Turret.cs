@@ -1,30 +1,29 @@
 using AditusBelli.Buildings;
-using AditusBelli.Teams;
+using AditusBelli.Entities;
 using UnityEngine;
 
 namespace AditusBelli.Combat
 {
     /// <summary>
     /// A stationary building weapon (guard tower): auto-acquires the nearest hostile
-    /// <see cref="Health"/> within range and damages it on a cooldown. Instant hit
+    /// <see cref="Entity"/> within range and damages it on a cooldown. Instant hit
     /// (no projectile art yet). Only fires once the building it sits on is complete.
     /// </summary>
-    [RequireComponent(typeof(Owner))]
     public class Turret : MonoBehaviour
     {
         public int attackDamage = 8;
         public float range = 7f;
         public float attackCooldown = 1f;
 
-        private Owner _owner;
+        private Entity _owner;
         private Building _building;
-        private Health _target;
+        private Entity _target;
         private float _cooldown;
         private float _scanTimer;
 
         private void Awake()
         {
-            _owner = GetComponent<Owner>();
+            _owner = GetComponent<Entity>();
             _building = GetComponent<Building>();
         }
 
@@ -49,7 +48,7 @@ namespace AditusBelli.Combat
             }
         }
 
-        private bool OutOfRange(Health h) =>
+        private bool OutOfRange(Entity h) =>
             ((Vector2)(h.transform.position - transform.position)).sqrMagnitude > range * range;
 
         private void Acquire()
@@ -58,13 +57,12 @@ namespace AditusBelli.Combat
             if (_scanTimer > 0f) return;
             _scanTimer = 0.3f;
 
-            Health best = null;
+            Entity best = null;
             float bestSq = range * range;
-            foreach (Health h in Health.All)
+            foreach (Entity h in Entity.All)
             {
                 if (h == null || !h.IsAlive || h.gameObject == gameObject) continue;
-                var otherOwner = h.GetComponent<Owner>();
-                if (otherOwner == null || !_owner.IsHostileTo(otherOwner)) continue;
+                if (!_owner.IsHostileTo(h)) continue;
 
                 float sq = ((Vector2)(h.transform.position - transform.position)).sqrMagnitude;
                 if (sq <= bestSq) { bestSq = sq; best = h; }

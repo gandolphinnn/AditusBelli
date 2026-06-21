@@ -293,15 +293,11 @@ namespace AditusBelli.EditorTools
             var col = go.AddComponent<CircleCollider2D>();
             col.radius = 0.3f;
 
-            var unit = go.AddComponent<Unit>();
+            var unit = go.AddComponent<Unit>(); // Unit is an Entity: owns team + HP
+            unit.team = team;
+            unit.applyTeamColor = true;
+            unit.maxHealth = 25;
             go.AddComponent<Villager>();
-
-            var owner = go.AddComponent<Owner>();
-            owner.team = team;
-            owner.applyTeamColor = true;
-
-            var health = go.AddComponent<Health>();
-            health.maxHealth = 25;
 
             var stats = go.AddComponent<UnitStats>();
             stats.displayName = "Villager";
@@ -337,14 +333,10 @@ namespace AditusBelli.EditorTools
             var col = go.AddComponent<CircleCollider2D>();
             col.radius = 0.32f;
 
-            var unit = go.AddComponent<Unit>();
-
-            var owner = go.AddComponent<Owner>();
-            owner.team = team;
-            owner.applyTeamColor = true;
-
-            var health = go.AddComponent<Health>();
-            health.maxHealth = 40;
+            var unit = go.AddComponent<Unit>(); // Unit is an Entity: owns team + HP
+            unit.team = team;
+            unit.applyTeamColor = true;
+            unit.maxHealth = 40;
 
             go.AddComponent<Combatant>();
 
@@ -392,13 +384,9 @@ namespace AditusBelli.EditorTools
 
             go.AddComponent<CircleCollider2D>().radius = 0.4f * Mathf.Max(1, Mathf.Max(footprint.x, footprint.y));
 
-            var owner = go.AddComponent<Owner>();
-            owner.applyTeamColor = false; // buildings keep their type color; team is set at spawn
-
-            var health = go.AddComponent<Health>();
-            health.maxHealth = maxHealth;
-
-            var building = go.AddComponent<Building>();
+            var building = go.AddComponent<Building>(); // Building is an Entity: owns team + HP
+            building.applyTeamColor = false; // buildings keep their type color; team is set at spawn
+            building.maxHealth = maxHealth;
             building.displayName = displayName;
             building.footprint = footprint;
             building.woodCost = woodCost;
@@ -443,15 +431,11 @@ namespace AditusBelli.EditorTools
             var col = go.AddComponent<CircleCollider2D>();
             col.radius = 0.34f;
 
-            var unit = go.AddComponent<Unit>();
+            var unit = go.AddComponent<Unit>(); // Unit is an Entity: owns team + HP
             unit.naval = true; // travels over open water
-
-            var owner = go.AddComponent<Owner>();
-            owner.team = team;
-            owner.applyTeamColor = true;
-
-            var health = go.AddComponent<Health>();
-            health.maxHealth = 60;
+            unit.team = team;
+            unit.applyTeamColor = true;
+            unit.maxHealth = 60;
 
             var stats = go.AddComponent<UnitStats>();
             stats.displayName = "Ship";
