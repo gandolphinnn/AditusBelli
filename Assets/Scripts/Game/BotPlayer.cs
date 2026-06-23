@@ -79,6 +79,12 @@ namespace AditusBelli.Game
         public int targetShips = 2;
         [Tooltip("Min wood before the bot invests in a dock.")]
         public int dockMinWood = 150;
+        [Tooltip("When stuck on an island, load soldiers onto a transport and invade across water.")]
+        public bool enableSeaInvasion = true;
+        [Tooltip("Soldiers loaded per sea invasion before the transport sails.")]
+        public int invasionSquadSize = 4;
+        [Tooltip("Seconds between checks of whether the nearest known enemy is reachable by land.")]
+        public float seaCheckInterval = 3f;
 
         [Header("Scouting")]
         public bool enableScouting = true;
@@ -104,6 +110,14 @@ namespace AditusBelli.Game
         private Vector3 _threatPos;
 
         private Villager _scout;
+
+        // sea-invasion state
+        private enum SeaPhase { Idle, Loading, Sailing }
+        private bool _islandLocked;
+        private float _seaTimer;
+        private Transport _invasionShip;
+        private SeaPhase _seaPhase;
+        private float _loadTimer;
 
         // cached building names (read from the prefabs so matching can't drift)
         private string _nameTownCenter, _nameHouse, _nameWarehouse, _nameBarracks, _nameTower, _nameWall, _nameDock;
@@ -165,6 +179,7 @@ namespace AditusBelli.Game
 
             Refresh();
             ComputeThreat();
+            UpdateIslandLock();
 
             ManageWorkers();
             ManagePopulation();
@@ -173,6 +188,7 @@ namespace AditusBelli.Game
             ManageMilitary();
             ManageDefense();
             ManageNaval();
+            ManageSeaLogistics();
         }
 
         // --------------------------------------------------------------- sensing
@@ -324,9 +340,10 @@ namespace AditusBelli.Game
                 if (far != null) TryBuild(_loadout.warehouse, Cell(far.transform.position), 1, 4);
             }
 
-            // Dock: only once the economy is comfortable and we have a barracks running.
-            if (enableNaval && _econ.Get(ResourceType.Wood) >= dockMinWood &&
-                CountOwned(_nameBarracks, true) > 0 && CountOwned(_nameDock, true) == 0)
+            // Dock: once the economy is comfortable, or sooner if we're stuck on an island and
+            // need transports to reach the enemy. Requires a barracks (troops to ferry over).
+            if (enableNaval && CountOwned(_nameDock, true) == 0 && CountOwned(_nameBarracks, true) > 0 &&
+                (_islandLocked || _econ.Get(ResourceType.Wood) >= dockMinWood))
                 TryBuild(_loadout.dock, HomeCell(), 2, 14, needsWater: true);
         }
 
@@ -409,16 +426,110 @@ namespace AditusBelli.Game
             var producer = dock.GetComponent<UnitProducer>();
             if (producer != null)
             {
+                // Keep a transport on hand; guarantee at least one when we must invade by sea.
+                int wantShips = Mathf.Max(targetShips, _islandLocked ? 1 : 0);
                 GameObject ship = producer.FirstTrainable;
-                if (ship != null && _ships.Count + producer.QueueCount < targetShips)
+                if (ship != null && _ships.Count + producer.QueueCount < wantShips)
                     producer.Enqueue(ship);
             }
 
-            // Ships have no weapon yet — use them to patrol/scout the sea, extending vision.
+            if (_islandLocked) return; // ships are reserved for invasion (ManageSeaLogistics drives them)
+
+            // Otherwise ships have no weapon — use them to patrol/scout the sea, extending vision.
             foreach (Unit s in _ships)
             {
                 if (s == null || s.IsMoving) continue;
                 if (TryGetNavalFrontier(s.transform.position, out Vector3 water)) s.MoveTo(water);
+            }
+        }
+
+        // --------------------------------------------------------------- sea invasion
+
+        private void UpdateIslandLock()
+        {
+            if (!enableNaval || !enableSeaInvasion) { _islandLocked = false; return; }
+
+            _seaTimer -= thinkInterval;
+            if (_seaTimer > 0f) return;
+            _seaTimer = seaCheckInterval;
+
+            // Island-locked when we know of an enemy but no land route reaches it.
+            Entity enemy = NearestKnownEnemy(_homeWorld);
+            _islandLocked = enemy != null &&
+                            _grid.FindPath(_homeWorld, enemy.transform.position, false) == null;
+        }
+
+        private void ManageSeaLogistics()
+        {
+            if (!_islandLocked) { _seaPhase = SeaPhase.Idle; return; }
+
+            Transport ship = InvasionShip();
+            if (ship == null) return; // no transport yet — ManageBuildOrder/ManageNaval are getting one
+
+            Entity target = NearestKnownEnemy(ship.transform.position);
+            if (target == null) { _seaPhase = SeaPhase.Idle; return; }
+
+            switch (_seaPhase)
+            {
+                case SeaPhase.Idle:
+                    _seaPhase = SeaPhase.Loading;
+                    _loadTimer = 0f;
+                    break;
+
+                case SeaPhase.Loading:
+                    BringShipHome(ship);
+                    LoadInvasionSquad(ship);
+                    _loadTimer += thinkInterval;
+                    // Sail once the squad is aboard (or after a grace period with at least one).
+                    if (ship.CargoCount >= invasionSquadSize || (_loadTimer >= 15f && ship.CargoCount > 0))
+                    {
+                        ship.UnloadAt(target.transform.position);
+                        _seaPhase = SeaPhase.Sailing;
+                        if (verbose) Debug.Log($"[{_team.displayName}] sea invasion: {ship.CargoCount} troops sailing.");
+                    }
+                    break;
+
+                case SeaPhase.Sailing:
+                    if (ship.CargoCount == 0) _seaPhase = SeaPhase.Idle; // delivered; prepare the next run
+                    break;
+            }
+        }
+
+        private Transport InvasionShip()
+        {
+            if (_invasionShip != null) return _invasionShip;
+            foreach (Unit s in _ships)
+            {
+                if (s == null) continue;
+                var t = s.GetComponent<Transport>();
+                if (t != null) { _invasionShip = t; return t; }
+            }
+            return null;
+        }
+
+        private void BringShipHome(Transport ship)
+        {
+            // Hold the transport at our shore while loading so soldiers can reach it.
+            Unit u = ship.GetComponent<Unit>();
+            if (u == null || u.IsMoving) return;
+            if (((Vector2)(ship.transform.position - _homeWorld)).sqrMagnitude > 100f)
+                u.MoveTo(_homeWorld); // naval pathfinder stops at the water nearest our base
+        }
+
+        private void LoadInvasionSquad(Transport ship)
+        {
+            foreach (Combatant c in _soldiers)
+            {
+                if (ship.CargoCount + ship.PendingCount >= invasionSquadSize) break;
+                if (c == null) continue;
+                Unit u = c.GetComponent<Unit>();
+                if (u == null) continue;
+
+                ship.Board(u);
+                // Pre-commit boarded troops as attackers (leash off) so they engage after
+                // landing instead of trying to guard their old home across the water.
+                c.guardRadius = 0f;
+                if (!_attackers.Contains(c)) _attackers.Add(c);
             }
         }
 

@@ -12,7 +12,7 @@ namespace AditusBelli.Map
     public class WorldMapGenerator : WorldGeneratorBase
     {
         [Header("World type")]
-        [Tooltip("Selects the hand-tuned recipe from WorldRecipes. Only Pangea for now.")]
+        [Tooltip("Selects the hand-tuned recipe from WorldRecipes (Pangea or Big Islands).")]
         public WorldType worldType = WorldType.Pangea;
 
         protected override WorldRecipe Recipe => WorldRecipes.For(worldType);

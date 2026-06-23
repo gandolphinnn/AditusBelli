@@ -3,14 +3,14 @@ using UnityEngine;
 namespace AditusBelli.Map
 {
     /// <summary>
-    /// Macro layout of the generated world (chosen before generating). Only
-    /// <see cref="Pangea"/> is implemented for now; Archipelago / Continents (and possibly
-    /// other shapes) are planned for later — add an enum value and a case in
-    /// <see cref="WorldMap"/>'s shaping switch.
+    /// Macro layout of the generated world (chosen before generating). Each type is a
+    /// shaping pass in <see cref="WorldMap"/>; add a new shape by adding an enum value and
+    /// a case there (plus a recipe in <see cref="WorldRecipes"/>).
     /// </summary>
     public enum WorldType
     {
-        Pangea, // a single large landmass; water only where the noise dips below sea level
+        Pangea,     // a single large landmass; water only where the noise dips below sea level
+        BigIslands, // several large islands separated by open sea (a low-frequency mask carves them)
     }
 
     /// <summary>Inputs to <see cref="WorldMap.Generate"/> (filled from the generator component).</summary>
@@ -25,7 +25,9 @@ namespace AditusBelli.Map
         public int octaves;        // fractal detail layers
         public float persistence;  // amplitude falloff per octave
         public float lacunarity;   // frequency growth per octave
-        public float islandFalloff; // Pangea: radial edge falloff (higher = larger island)
+        public float islandFalloff; // radial edge falloff (higher = larger landmass; map border stays sea)
+        public float islandScale;     // BigIslands: island-mask frequency (~ islands across the map; lower = fewer/larger)
+        public float islandThreshold; // BigIslands: sea level of the island mask (higher = more open ocean)
         public int beachWaterRadius; // Beach kept only within this many tiles of water (0 = off)
 
         // Ascending elevation thresholds in [0,1]; everything above hillLevel is Mountain.
@@ -76,6 +78,11 @@ namespace AditusBelli.Map
                 offY[o] = (float)rng.NextDouble() * 200000f - 100000f;
             }
 
+            // Low-frequency offsets for the BigIslands continent mask. Drawn after the
+            // octave offsets so a given seed produces the same Pangea map as before.
+            float islandOffX = (float)rng.NextDouble() * 200000f - 100000f;
+            float islandOffY = (float)rng.NextDouble() * 200000f - 100000f;
+
             // Pass 1: fractal Brownian motion height, tracking range for normalization.
             var raw = new float[w * h];
             float min = float.MaxValue, max = float.MinValue;
@@ -107,7 +114,8 @@ namespace AditusBelli.Map
                 float v = (raw[y * w + x] - min) * invRange;
                 float nx = w > 1 ? x / (float)(w - 1) : 0.5f;
                 float ny = h > 1 ? y / (float)(h - 1) : 0.5f;
-                v = Shape(v, nx, ny, s.worldType, s.islandFalloff);
+                float islandMask = IslandMask(s, nx, ny, islandOffX, islandOffY);
+                v = Shape(v, nx, ny, s.worldType, s.islandFalloff, islandMask);
                 cells[y * w + x] = Classify(v, s);
             }
 
@@ -147,23 +155,44 @@ namespace AditusBelli.Map
             return false;
         }
 
-        /// <summary>Bends the normalized height according to the chosen world type.</summary>
-        private static float Shape(float v, float nx, float ny, WorldType worldType, float islandFalloff)
+        /// <summary>
+        /// BigIslands continent mask: a low-frequency Perlin field thresholded into island
+        /// (~1) and open-sea (~0) regions with a soft coast. Returns 1 for other world types
+        /// (no extra masking).
+        /// </summary>
+        private static float IslandMask(WorldGenSettings s, float nx, float ny, float offX, float offY)
         {
+            if (s.worldType != WorldType.BigIslands) return 1f;
+            float freq = Mathf.Max(0.5f, s.islandScale);
+            float cm = Mathf.PerlinNoise(nx * freq + offX, ny * freq + offY);
+            float t = Mathf.Clamp01(s.islandThreshold);
+            // Soft 0.30-wide coastline centered on the threshold.
+            return Mathf.SmoothStep(0f, 1f, (cm - (t - 0.15f)) / 0.30f);
+        }
+
+        /// <summary>Bends the normalized height according to the chosen world type.</summary>
+        private static float Shape(float v, float nx, float ny, WorldType worldType, float islandFalloff,
+            float islandMask)
+        {
+            // Radial edge mask shared by every shape: pulls the map border down to deep sea
+            // so the world is always ringed by ocean. Higher islandFalloff lets land reach
+            // farther out before the falloff bites.
+            float dx = nx * 2f - 1f;
+            float dy = ny * 2f - 1f;
+            float d = Mathf.Sqrt(dx * dx + dy * dy); // 0 at center, >=1 at edges/corners
+            float edge = Mathf.Clamp01(1f - Mathf.Pow(Mathf.Clamp01(d), Mathf.Max(0.1f, islandFalloff)));
+
             switch (worldType)
             {
-                // Pangea: a single landmass fully ringed by sea. A radial mask pulls the
-                // map edges down to deep sea (so the border is always ocean); higher
-                // islandFalloff keeps the mask near 1 farther out = a larger central island.
+                // BigIslands: the continent mask carves the noise into several large islands;
+                // the edge mask keeps the border as open sea.
+                case WorldType.BigIslands:
+                    return v * edge * Mathf.Clamp01(islandMask);
+
+                // Pangea: a single central landmass fully ringed by sea.
                 case WorldType.Pangea:
                 default:
-                {
-                    float dx = nx * 2f - 1f;
-                    float dy = ny * 2f - 1f;
-                    float d = Mathf.Sqrt(dx * dx + dy * dy); // 0 at center, >=1 at edges/corners
-                    float mask = 1f - Mathf.Pow(Mathf.Clamp01(d), Mathf.Max(0.1f, islandFalloff));
-                    return v * Mathf.Clamp01(mask);
-                }
+                    return v * edge;
             }
         }
 

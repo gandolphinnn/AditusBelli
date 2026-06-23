@@ -3,6 +3,7 @@ using AditusBelli.Buildings;
 using AditusBelli.Combat;
 using AditusBelli.Economy;
 using AditusBelli.Entities;
+using AditusBelli.Map;
 using AditusBelli.Teams;
 using AditusBelli.UI;
 using UnityEngine;
@@ -206,6 +207,20 @@ namespace AditusBelli.Units
 
             Collider2D hit = Physics2D.OverlapPoint(world);
 
+            // Right-clicking our own transport ship loads the selected land units onto it.
+            Transport boardTarget = hit != null ? hit.GetComponentInParent<Transport>() : null;
+            if (boardTarget != null && IsLocalPlayerUnit(boardTarget.GetComponent<Unit>()))
+            {
+                bool boarded = false;
+                foreach (Unit u in _selected)
+                {
+                    if (u == null || u.naval) continue; // only land units board
+                    boardTarget.Board(u);
+                    boarded = true;
+                }
+                if (boarded) return;
+            }
+
             // Right-clicking an enemy entity orders an attack.
             Entity enemy = hit != null ? hit.GetComponentInParent<Entity>() : null;
             if (enemy != null && IsEnemy(enemy))
@@ -245,12 +260,28 @@ namespace AditusBelli.Units
                 return;
             }
 
-            // Otherwise: plain move order in formation, cancelling current tasks.
+            // Otherwise: a move order. A loaded transport unloads on a land target (or just
+            // sails); everyone else moves in formation, cancelling current tasks.
+            GameGrid grid = GameGrid.Instance;
+            Vector3Int tcell = grid != null ? grid.WorldToCell(world) : default;
+            bool landTarget = grid != null && grid.IsWalkable(new Vector2Int(tcell.x, tcell.y));
+
             world.z = 0f;
             int count = _selected.Count;
             int cols = Mathf.Max(1, Mathf.CeilToInt(Mathf.Sqrt(count)));
             for (int i = 0; i < count; i++)
             {
+                Unit u = _selected[i];
+                if (u == null) continue;
+
+                var transport = u.GetComponent<Transport>();
+                if (transport != null)
+                {
+                    if (landTarget && transport.CargoCount > 0) transport.UnloadAt(world);
+                    else u.MoveTo(world);
+                    continue;
+                }
+
                 int row = i / cols;
                 int col = i % cols;
                 var offset = new Vector3(
@@ -258,11 +289,11 @@ namespace AditusBelli.Units
                     (row - (cols - 1) * 0.5f) * formationSpacing * 0.5f, // compressed for isometric
                     0f);
 
-                var villager = _selected[i].GetComponent<Villager>();
+                var villager = u.GetComponent<Villager>();
                 if (villager != null) villager.StopTasks();
-                var combatant = _selected[i].GetComponent<Combatant>();
+                var combatant = u.GetComponent<Combatant>();
                 if (combatant != null) combatant.StopCombat();
-                _selected[i].MoveTo(world + offset);
+                u.MoveTo(world + offset);
             }
         }
 

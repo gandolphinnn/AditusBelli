@@ -455,7 +455,10 @@ namespace AditusBelli.EditorTools
             unit.naval = true; // travels over open water
             unit.team = team;
             unit.applyTeamColor = true;
-            unit.maxHealth = 60;
+            unit.maxHealth = 120; // a carrier: sturdier than a soldier, but no weapon
+
+            // Transport: carries land units across water (load near shore, unload on a coast).
+            go.AddComponent<Transport>().capacity = 5;
 
             var stats = go.AddComponent<UnitStats>();
             stats.displayName = "Ship";

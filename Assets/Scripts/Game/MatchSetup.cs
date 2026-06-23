@@ -177,7 +177,8 @@ namespace AditusBelli.Game
 
             int idx = 0;
             for (int i = 0; i < teams.Length; i++) if (teams[i] == teamManager.localPlayer) { idx = i; break; }
-            if (idx >= layout.CityCenters.Count) return;
+            if (layout.CityCenters.Count == 0) return;    // no land could be placed at all
+            if (idx >= layout.CityCenters.Count) idx = 0; // frame some base rather than the empty sea
 
             Vector2Int fp = TownCenterFootprint();
             Vector3 c = FootprintCenter(grid, layout.CityCenters[idx], fp.x, fp.y);

@@ -153,6 +153,6 @@ MonoBehaviour:
   isDropoff: 0
   requiresAdjacentWater: 1
   trains:
-  - {fileID: 8247400669982767728, guid: 146993688d3aa9445938576d6a517cb1, type: 3}
+  - {fileID: 4597061273183044533, guid: 146993688d3aa9445938576d6a517cb1, type: 3}
   originCell: {x: 0, y: 0}
   startCompleted: 0

@@ -52,20 +52,27 @@ namespace AditusBelli.Map
             int margin = Mathf.Max(0, s.edgeMargin);
             var rng = new System.Random(unchecked(s.seed * 73856093) ^ 0x632be5ab);
 
-            var land = new List<Vector2Int>();         // buildable cells (index coords)
-            var ccCandidates = new List<Vector2Int>(); // clear buildable footprints, off the edge
+            // Buildable cells feed resource scatter. City-center candidates are footprints
+            // off the map edge: we accept every WALKABLE footprint (so island maps with
+            // little inland still yield base spots) but remember which are fully BUILDABLE
+            // so bases prefer inland Plain/Hill over the shoreline.
+            var land = new List<Vector2Int>();           // buildable cells (index coords)
+            var ccCandidates = new List<Vector2Int>();   // walkable footprints, off the edge
+            var buildableOrigins = new HashSet<int>();   // the subset that is fully buildable
             for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++)
             {
-                if (!map.Get(x, y).IsBuildable()) continue;
-                land.Add(new Vector2Int(x, y));
-                if (x >= margin && y >= margin &&
-                    x + fp - 1 <= w - 1 - margin && y + fp - 1 <= h - 1 - margin &&
-                    FootprintBuildable(map, x, y, fp))
-                    ccCandidates.Add(new Vector2Int(x, y));
+                if (map.Get(x, y).IsBuildable()) land.Add(new Vector2Int(x, y));
+
+                bool offEdge = x >= margin && y >= margin &&
+                               x + fp - 1 <= w - 1 - margin && y + fp - 1 <= h - 1 - margin;
+                if (!offEdge || !FootprintWalkable(map, x, y, fp)) continue;
+                ccCandidates.Add(new Vector2Int(x, y));
+                if (FootprintBuildable(map, x, y, fp)) buildableOrigins.Add(y * w + x);
             }
 
-            List<Vector2Int> ccIndex = PickCityCenters(ccCandidates, Mathf.Max(0, s.playerCount), rng);
+            List<Vector2Int> ccIndex = PickCityCenters(map, ccCandidates, buildableOrigins,
+                Mathf.Max(0, s.playerCount), w, h, rng);
 
             // "Blocked" cells can't take a resource (city-center footprints + spacing rings).
             var blocked = new HashSet<int>();
@@ -142,18 +149,75 @@ namespace AditusBelli.Map
         }
 
         /// <summary>
-        /// Picks city centers that are spaced apart by a minimum separation but otherwise
-        /// random — they are NOT pushed to the map extremes. The separation relaxes if the
-        /// buildable area is too small to satisfy it.
+        /// Picks city-center footprints, one per island where possible. Candidates are
+        /// grouped by connected landmass (walkable component); players are spread across the
+        /// largest islands first (round-robin), only doubling up on an island when there are
+        /// fewer islands than players. Within an island, fully buildable (inland) spots are
+        /// preferred over the shoreline and kept a minimum distance apart. Single-landmass
+        /// maps (Pangea) behave as before; island maps always place every base on real land
+        /// instead of leaving a player baseless in the middle of the sea.
         /// </summary>
-        private static List<Vector2Int> PickCityCenters(List<Vector2Int> candidates, int count,
-            System.Random rng)
+        private static List<Vector2Int> PickCityCenters(WorldMap map, List<Vector2Int> candidates,
+            HashSet<int> buildableOrigins, int count, int w, int h, System.Random rng)
         {
             var chosen = new List<Vector2Int>();
             if (candidates.Count == 0 || count == 0) return chosen;
 
-            int minX = int.MaxValue, minY = int.MaxValue, maxX = int.MinValue, maxY = int.MinValue;
+            int[] comp = WalkableComponents(map, w, h);
+
+            // Group candidate footprints by island, buildable (inland) spots first.
+            var byComp = new Dictionary<int, List<Vector2Int>>();
             foreach (Vector2Int c in candidates)
+            {
+                int label = comp[c.y * w + c.x];
+                if (label < 0) continue; // candidates are walkable, so this should not happen
+                if (!byComp.TryGetValue(label, out List<Vector2Int> list)) byComp[label] = list = new List<Vector2Int>();
+                list.Add(c);
+            }
+
+            var islands = new List<List<Vector2Int>>();
+            foreach (List<Vector2Int> all in byComp.Values)
+            {
+                var build = new List<Vector2Int>();
+                var shore = new List<Vector2Int>();
+                foreach (Vector2Int c in all)
+                    (buildableOrigins.Contains(c.y * w + c.x) ? build : shore).Add(c);
+                Shuffle(build, rng);
+                Shuffle(shore, rng);
+                build.AddRange(shore); // buildable first, shoreline only as a fallback
+                islands.Add(build);
+            }
+            islands.Sort((a, b) => b.Count - a.Count); // largest islands first
+
+            // One base per island per pass; repeat passes to double up only when players
+            // outnumber islands.
+            while (chosen.Count < count)
+            {
+                bool placedAny = false;
+                foreach (List<Vector2Int> isl in islands)
+                {
+                    if (chosen.Count >= count) break;
+                    if (isl.Count == 0) continue;
+
+                    float minSep = IslandMinSep(isl);
+                    int pick = -1;
+                    for (int k = 0; k < isl.Count; k++)
+                        if (FarEnoughOnIsland(isl[k], chosen, comp, w, minSep)) { pick = k; break; }
+                    if (pick < 0) pick = 0; // island too tight to space: take any remaining
+
+                    chosen.Add(isl[pick]);
+                    isl.RemoveAt(pick);
+                    placedAny = true;
+                }
+                if (!placedAny) break;
+            }
+            return chosen;
+        }
+
+        private static float IslandMinSep(List<Vector2Int> island)
+        {
+            int minX = int.MaxValue, minY = int.MaxValue, maxX = int.MinValue, maxY = int.MinValue;
+            foreach (Vector2Int c in island)
             {
                 if (c.x < minX) minX = c.x;
                 if (c.x > maxX) maxX = c.x;
@@ -161,32 +225,57 @@ namespace AditusBelli.Map
                 if (c.y > maxY) maxY = c.y;
             }
             float span = Mathf.Max(maxX - minX, maxY - minY);
-            float minSep = Mathf.Max(3f, span * 0.3f); // spaced, but not maximal
-
-            chosen.Add(candidates[rng.Next(candidates.Count)]);
-            int guard = count * 60;
-            while (chosen.Count < count && guard-- > 0)
-            {
-                bool placed = false;
-                for (int attempt = 0; attempt < 50; attempt++)
-                {
-                    Vector2Int cand = candidates[rng.Next(candidates.Count)];
-                    if (FarEnough(cand, chosen, minSep)) { chosen.Add(cand); placed = true; break; }
-                }
-                if (!placed) minSep = Mathf.Max(3f, minSep * 0.8f); // ease spacing and retry
-            }
-            return chosen;
+            return Mathf.Max(3f, span * 0.3f); // spaced, but not maximal
         }
 
-        private static bool FarEnough(Vector2Int c, List<Vector2Int> chosen, float minSep)
+        private static bool FarEnoughOnIsland(Vector2Int c, List<Vector2Int> chosen, int[] comp, int w, float minSep)
         {
+            int label = comp[c.y * w + c.x];
             float m2 = minSep * minSep;
             foreach (Vector2Int ch in chosen)
             {
+                if (comp[ch.y * w + ch.x] != label) continue; // only space bases on the same island
                 long dx = c.x - ch.x, dy = c.y - ch.y;
                 if (dx * dx + dy * dy < m2) return false;
             }
             return true;
+        }
+
+        /// <summary>Labels each walkable cell with its connected-component (island) id; -1 elsewhere.</summary>
+        private static int[] WalkableComponents(WorldMap map, int w, int h)
+        {
+            var comp = new int[w * h];
+            for (int i = 0; i < comp.Length; i++) comp[i] = -1;
+
+            var stack = new Stack<int>();
+            int next = 0;
+            for (int sy = 0; sy < h; sy++)
+            for (int sx = 0; sx < w; sx++)
+            {
+                int si = sy * w + sx;
+                if (comp[si] != -1 || !map.Get(sx, sy).IsWalkable()) continue;
+
+                comp[si] = next;
+                stack.Push(si);
+                while (stack.Count > 0)
+                {
+                    int idx = stack.Pop();
+                    int cx = idx % w, cy = idx / w;
+                    for (int dy = -1; dy <= 1; dy++)
+                    for (int dx = -1; dx <= 1; dx++)
+                    {
+                        if (dx == 0 && dy == 0) continue;
+                        int nx = cx + dx, ny = cy + dy;
+                        if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
+                        int ni = ny * w + nx;
+                        if (comp[ni] != -1 || !map.Get(nx, ny).IsWalkable()) continue;
+                        comp[ni] = next;
+                        stack.Push(ni);
+                    }
+                }
+                next++;
+            }
+            return comp;
         }
 
         private static bool FootprintBuildable(WorldMap map, int x, int y, int fp)
@@ -194,6 +283,14 @@ namespace AditusBelli.Map
             for (int dy = 0; dy < fp; dy++)
             for (int dx = 0; dx < fp; dx++)
                 if (!map.Get(x + dx, y + dy).IsBuildable()) return false;
+            return true;
+        }
+
+        private static bool FootprintWalkable(WorldMap map, int x, int y, int fp)
+        {
+            for (int dy = 0; dy < fp; dy++)
+            for (int dx = 0; dx < fp; dx++)
+                if (!map.Get(x + dx, y + dy).IsWalkable()) return false;
             return true;
         }
 

@@ -186,6 +186,8 @@ namespace AditusBelli.Map
                 persistence = r.persistence,
                 lacunarity = r.lacunarity,
                 islandFalloff = r.islandFalloff,
+                islandScale = r.islandScale,
+                islandThreshold = r.islandThreshold,
                 deepSeaLevel = r.deepSeaLevel,
                 seaLevel = r.seaLevel,
                 beachLevel = r.beachLevel,
